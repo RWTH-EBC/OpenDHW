@@ -11,55 +11,98 @@ import random
 import matplotlib.dates as mdates
 
 
-def main():
+def compare_generators(first_method, first_series_LperH, second_method,
+                       second_series_LperH, s_step, start_plot,
+                       end_plot):
 
-    generate_dhw_profile_dhwcalc_alias(
-        normalize_probability_distribution=True,
-        normalize_mode='sum',
-        s_step=60
-    )
+    # compute Stats for first series
+    first_series_LperSec = [x / 3600 for x in first_series_LperH]
 
-    generate_dhw_profile_dhwcalc_alias(
-        normalize_probability_distribution=True,
-        normalize_mode='max',
-        s_step=60
-    )
+    first_series_non_zeros = len([x for x in first_series_LperH if x != 0])
 
-    generate_dhw_profile_dhwcalc_alias(
-        normalize_probability_distribution=False,
-        s_step=60
-    )
+    first_series_yearly_water_demand = round(sum(first_series_LperSec) *
+                                             s_step, 1)  # in L
+    first_series_av_daily_water = round(first_series_yearly_water_demand /
+                                        365, 1)
+    first_series_av_daily_water_lst = [first_series_av_daily_water for i in
+                                       first_series_LperH]  # L/day
+    first_series_max_water_flow = round(max(first_series_LperH), 1)  # in L/h
 
-    generate_dhw_profile_dhwcalc_alias(
-        normalize_probability_distribution=True,
-        normalize_mode='max',
-        s_step=600
-    )
+    # compute Stats for second series
+    second_series_LperSec = [x / 3600 for x in second_series_LperH]
 
-    generate_dhw_profile_dhwcalc_alias(
-        normalize_probability_distribution=True,
-        normalize_mode='sum',
-        s_step=6000
-    )
+    second_series_non_zeros = len([x for x in second_series_LperH if x != 0])
 
-    generate_dhw_profile_dhwcalc_alias(
-        normalize_probability_distribution=False,
-        s_step=600
-    )
+    second_series_yearly_water_demand = round(sum(second_series_LperSec) *
+                                              s_step, 1)  # in L
+    second_series_av_daily_water = round(second_series_yearly_water_demand /
+                                         365, 1)
+    second_series_av_daily_water_lst = [second_series_av_daily_water for i in
+                                        second_series_LperH]  # L/day
+    second_series_max_water_flow = round(max(second_series_LperH), 1)  # in L/h
+
+    # RWTH colours
+    rwth_blue = "#00549F"
+    rwth_red = "#CC071E"
+
+    # sns.set_style("white")
+    sns.set_context("paper")
+
+    # set date range to simplify plot slicing
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
+
+    # make dataframe for plotting with seaborn
+    first_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(first_method):
+                                first_series_LperH,
+                            'Yearly av. Demand [{} L/day]'.format(
+                                first_series_av_daily_water):
+                                first_series_av_daily_water_lst},
+                           index=date_range)
+
+    second_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(second_method):
+                                second_series_LperH,
+                            'Yearly av. Demand [{} L/day]'.format(
+                                second_series_av_daily_water):
+                                second_series_av_daily_water_lst},
+                           index=date_range)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+    # fig.tight_layout()
+
+    ax1 = sns.lineplot(ax=ax1, data=first_plot_df[start_plot:end_plot],
+                       linewidth=1.0, palette=[rwth_blue, rwth_red])
+
+    ax1.set_title('Water time-series from {}, timestep = {} s\n Yearly Demand ='
+                  '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
+        first_method, s_step, first_series_yearly_water_demand,
+        first_series_max_water_flow, first_series_non_zeros))
+
+    ax1.legend(loc="upper left")
+
+    ax2 = sns.lineplot(ax=ax2, data=second_plot_df[start_plot:end_plot],
+                       linewidth=1.0, palette=[rwth_blue, rwth_red])
+
+    ax2.set_title('Water time-series from {}, timestep = {} s\n Yearly Water '
+                  '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
+        second_method, s_step, second_series_yearly_water_demand,
+        second_series_max_water_flow, second_series_non_zeros))
+
+    ax2.legend(loc="upper left")
+
+    plt.show()
+
+    save_fig = True
+    if save_fig:
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+        fig.savefig(dir_output / "Demand_Comparision_sliced.pdf")
+
+    return fig
 
 
-    #
-    # x, water_pycity_alias_60 = generate_dhw_profile_pycity_alias(s_step=60)
-    # x, water_pycity_alias_600 = generate_dhw_profile_pycity_alias(s_step=600)
-    #
-    # x, water_pycity_60 = generate_dhw_profile_pycity(s_step=60)
-    # x, water_pycity_600 = generate_dhw_profile_pycity(s_step=600)
-
-    # x, water_dhwcalc_60 = import_from_dhwcalc(s_step=60)
-    # x, water_dhwcalc_600 = import_from_dhwcalc(s_step=600)
-
-
-def import_from_dhwcalc(s_step=60, temp_dT=35, print_stats=True,
+def import_from_dhwcalc(s_step, temp_dT=35, print_stats=True,
                         plot_demand=True, start_plot='2019-08-01',
                         end_plot='2019-08-03', save_fig=True):
     """
@@ -89,7 +132,7 @@ def import_from_dhwcalc(s_step=60, temp_dT=35, print_stats=True,
                    open(dhw_profile).readlines()]  # L/h each step
 
     # Plot
-    dhw_demand = compute_stats_and_plot_demand(
+    dhw_demand = compute_heat_and_plot_demand(
         method='DHWcalc',
         s_step=s_step,
         water_LperH=water_LperH,
@@ -228,7 +271,7 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
     return average_profile
 
 
-def generate_dhw_profile_dhwcalc_alias(normalize_probability_distribution,
+def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
                                        s_step, normalize_mode='max',
                                        initial_day=0, temp_dT=35,
                                        print_stats=True, plot_demand=True,
@@ -253,13 +296,13 @@ def generate_dhw_profile_dhwcalc_alias(normalize_probability_distribution,
         factor=1.2
     )
 
-    # average_profile = generate_average_daily_profile(
-    #     mode='gauss_abs',
-    #     l_day=200,
-    #     sigma_day=70,
-    #     av_p_day=av_p_week_weighted,
-    #     s_step=s_step,
-    # )
+    average_profile = generate_average_daily_profile(
+        mode='gauss_abs',
+        l_day=200,
+        sigma_day=70,
+        av_p_day=av_p_week_weighted,
+        s_step=s_step,
+    )
 
     # time series for return statement
     water_LperH = []  # in L/h
@@ -357,8 +400,6 @@ def generate_dhw_profile_dhwcalc_alias(normalize_probability_distribution,
             #     s_step=s_step
             # )
 
-
-
         elif normalize_mode == 'max':
 
             # PyCity algorythm, probabilities are scaled to their max
@@ -378,7 +419,7 @@ def generate_dhw_profile_dhwcalc_alias(normalize_probability_distribution,
                     water_LperH.append(0)
 
     # Plot
-    dhw_demand = compute_stats_and_plot_demand(
+    dhw_demand = compute_heat_and_plot_demand(
         method='DHWcalc_Alias',
         s_step=s_step,
         water_LperH=water_LperH,
@@ -552,9 +593,6 @@ def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
     return p_day
 
 
-
-
-
 def plot_average_profiles_pycity(save_fig=False):
 
     profiles_path = Path.cwd() / 'dhw_stochastical.xlsx'
@@ -608,8 +646,8 @@ def plot_average_profiles_pycity(save_fig=False):
         fig.savefig(dir_output / "Average_Profiles_PyCity.pdf")
 
 
-def compute_stats_and_plot_demand(method, s_step, water_LperH,
-                                  plot_demand=True, start_plot='2019-02-01',
+def compute_heat_and_plot_demand(method, s_step, water_LperH,
+                                  plot_demand=False, start_plot='2019-02-01',
                                   end_plot='2019-02-05', temp_dT=35,
                                   print_stats=False, save_fig=False):
     """
@@ -653,9 +691,9 @@ def compute_stats_and_plot_demand(method, s_step, water_LperH,
               " with a maximum of {:.2f} L/h".format(yearly_water_demand,
                                                      max_water_flow))
 
-        print("Yearly DHW energy demand from DHWcalc Alias is {:.2f} kWh"
-              " with a maximum of {:.2f} kW".format(yearly_dhw_demand,
-                                                    max_dhw_heat_flow))
+        # print("Yearly DHW energy demand from DHWcalc Alias is {:.2f} kWh"
+        #       " with a maximum of {:.2f} kW".format(yearly_dhw_demand,
+        #                                             max_dhw_heat_flow))
 
     if plot_demand:
         # RWTH colours
@@ -686,7 +724,7 @@ def compute_stats_and_plot_demand(method, s_step, water_LperH,
         # ax2 = sns.lineplot(ax=ax2, data=plot_df,
         #                    linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-        plt.legend(loc="upper left")
+        ax1.legend(loc="upper left")
 
         plt.title('Water and Heat time-series from {}, dT = {} °C, '
                   'timestep = {} s\n'
@@ -716,7 +754,3 @@ def compute_stats_and_plot_demand(method, s_step, water_LperH,
             fig.savefig(dir_output / "Demand_{}_sliced.pdf".format(method))
 
     return dhw  # in kWh
-
-
-if __name__ == '__main__':
-    main()
