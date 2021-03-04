@@ -9,13 +9,25 @@ import math
 import statistics
 import random
 from scipy.stats import beta
-import pylab
 import matplotlib.dates as mdates
 
 
 def compare_generators(first_method, first_series_LperH, second_method,
-                       second_series_LperH, s_step, start_plot,
-                       end_plot):
+                       second_series_LperH, s_step, start_plot='2019-03-01',
+                       end_plot='2019-03-08', save_fig=False):
+    """
+    Compares two methods of computing the water flow time series by means of
+    a subplot.
+    :param first_method:        string: name of first method (f.e. DHWcalc)
+    :param first_series_LperH:  list:   first water flow time series
+    :param second_method:       string: name of second method (f.e. OpenDHW)
+    :param second_series_LperH: list:   second water flow time series
+    :param s_step:              int:    seconds within a timestep
+    :param start_plot:          string: date, f.e. 2019-03-01
+    :param end_plot:            string: date, f.e. 2019-03-08
+    :param save_fig:            bool:   decide to save the plot
+    :return:
+    """
 
     # compute Stats for first series
     first_series_LperSec = [x / 3600 for x in first_series_LperH]
@@ -57,21 +69,21 @@ def compare_generators(first_method, first_series_LperH, second_method,
 
     # make dataframe for plotting with seaborn
     first_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(first_method):
-                                first_series_LperH,
-                            'Yearly av. Demand [{} L/day]'.format(
-                                first_series_av_daily_water):
-                                first_series_av_daily_water_lst},
-                           index=date_range)
+                                      first_series_LperH,
+                                  'Yearly av. Demand [{} L/day]'.format(
+                                      first_series_av_daily_water):
+                                      first_series_av_daily_water_lst},
+                                 index=date_range)
 
     second_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(second_method):
-                                second_series_LperH,
-                            'Yearly av. Demand [{} L/day]'.format(
-                                second_series_av_daily_water):
-                                second_series_av_daily_water_lst},
-                           index=date_range)
+                                       second_series_LperH,
+                                   'Yearly av. Demand [{} L/day]'.format(
+                                       second_series_av_daily_water):
+                                       second_series_av_daily_water_lst},
+                                  index=date_range)
 
     fig, (ax1, ax2) = plt.subplots(2, 1)
-    # fig.tight_layout()
+    fig.tight_layout()
 
     ax1 = sns.lineplot(ax=ax1, data=first_plot_df[start_plot:end_plot],
                        linewidth=1.0, palette=[rwth_blue, rwth_red])
@@ -99,7 +111,7 @@ def compare_generators(first_method, first_series_LperH, second_method,
     if save_fig:
         dir_output = Path.cwd() / "plots"
         dir_output.mkdir(exist_ok=True)
-        fig.savefig(dir_output / "Demand_Comparision_sliced.pdf")
+        fig.savefig(dir_output / "Demand_Comparision.pdf")
 
     return fig
 
@@ -239,7 +251,6 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
 
         if statistics.mean(average_profile) != statistics.mean(
                 average_profile_abs):
-
             scale = statistics.mean(average_profile) / statistics.mean(
                 average_profile_abs)
 
@@ -273,17 +284,11 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
     return average_profile
 
 
-def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
-                                      s_step, weekend_weekday_factor=1.2,
-                                      mean_vol_per_drawoff=8,
-                                      mean_drawoff_vol_per_day=200,
-                                      normalize_mode='max', initial_day=0,
-                                      temp_dT=35, print_stats=True,
-                                      plot_demand=True,
-                                      start_plot='2019-01-01',
-                                      end_plot='2019-01-03', save_fig=False):
-
-    timesteps_day = int(24 * 3600 / s_step)
+def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
+                                         initial_day=0, temp_dT=35,
+                                         print_stats=True, plot_demand=True,
+                                         start_plot='2019-01-01',
+                                         end_plot='2019-01-03', save_fig=False):
 
     p_we = generate_daily_probability_step_function(
         mode='weekend',
@@ -309,119 +314,84 @@ def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
         s_step=s_step,
     )
 
-    # time series for return statement
-    water_LperH = []  # in L/h
-    p_final = []
+    p_final = generate_yearly_probabilities(
+        initial_day=initial_day,
+        p_weekend=p_we_weighted,
+        p_weekday=p_wd_weighted,
+        s_step=s_step
+    )
 
-    if not normalize_probability_distribution:
+    p_final = normalize_list_to_max(lst=p_final)
 
-        # how it is done in PyCity
+    water_LperH = distribute_average_profile(
+        average_profile=average_profile,
+        p_final=p_final,
+        s_step=s_step
+    )
 
-        for day in range(365):
+    # Plot
+    dhw_demand = compute_heat_and_plot_demand(
+        method='Average_Profile_Method',
+        s_step=s_step,
+        water_LperH=water_LperH,
+        start_plot=start_plot,
+        end_plot=end_plot,
+        temp_dT=temp_dT,
+        print_stats=print_stats,
+        plot_demand=plot_demand,
+        save_fig=save_fig
+    )
 
-            # Is the current day on a weekend?
-            if (day + initial_day) % 7 >= 5:
-                p_day = p_we_weighted
-            else:
-                p_day = p_wd_weighted
+    return dhw_demand, water_LperH
 
-            water_daily = []
 
-            # Compute seasonal factor
-            arg = math.pi * (2 / 365 * day - 1 / 4)
-            probability_season = 1 + 0.1 * np.cos(arg)
+def generate_dhw_profile_open_dhwcalc(s_step, weekend_weekday_factor=1.2,
+                                      mean_vol_per_drawoff=8,
+                                      mean_drawoff_vol_per_day=200,
+                                      initial_day=0, temp_dT=35,
+                                      print_stats=True, plot_demand=True,
+                                      start_plot='2019-01-01',
+                                      end_plot='2019-01-03', save_fig=False):
 
-            for step in range(timesteps_day):
+    p_we = generate_daily_probability_step_function(
+        mode='weekend',
+        s_step=s_step
+    )
 
-                # Compute probability for tap water demand at timestep
-                probability = p_day[step] * probability_season
-                p_final.append(probability)
+    p_wd = generate_daily_probability_step_function(
+        mode='weekday',
+        s_step=s_step
+    )
 
-                # Check if tap water demand occurs. The higher the probability,
-                # the more likely the if statement is true.
-                if random.random() < probability:
+    p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
+        p_weekday=p_wd,
+        p_weekend=p_we,
+        factor=weekend_weekday_factor
+    )
 
-                    # Compute amount of tap water consumption. Start with seed?
-                    # This consumption has to be positive!
-                    # Problem: when the absolute is taken, the mean and sigma of
-                    # the gauss distribution is changed, and the total daily
-                    # draw-off volume changes!
-                    water_t = random.gauss(average_profile[step], sigma=114.33)
-                    water_daily.append(abs(water_t))
-                else:
-                    water_daily.append(0)
+    p_final = generate_yearly_probabilities(
+        initial_day=initial_day,
+        p_weekend=p_we_weighted,
+        p_weekday=p_wd_weighted,
+        s_step=s_step
+    )
 
-            # Include current_water and current_heat in water and heat
-            water_LperH.extend(water_daily)
+    p_norm_integral = normalize_and_sum_list(lst=p_final)
 
-    else:   # normalize probability distribution
+    drawoffs, p_drawoffs = generate_drawoffs(
+        method='beta',
+        mean_vol_per_drawoff=mean_vol_per_drawoff,
+        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        s_step=s_step,
+        p_norm_integral=p_norm_integral
+    )
 
-        for day in range(365):
-
-            # Is the current day on a weekend?
-            if (day + initial_day) % 7 >= 5:
-                p_day = p_we_weighted
-            else:
-                p_day = p_wd_weighted
-
-            # Compute seasonal factor
-            arg = math.pi * (2 / 365 * day - 1 / 4)
-            probability_season = 1 + 0.1 * np.cos(arg)
-
-            for step in range(timesteps_day):
-
-                probability = p_day[step] * probability_season
-                p_final.append(probability)
-
-        if normalize_mode == 'sum':     # how it is probably done in DHWcalc
-
-            p_norm_integral = normalize_and_sum_list(lst=p_final)
-
-            drawoffs, p_drawoffs = generate_drawoffs(
-                mean_vol_per_drawoff=mean_vol_per_drawoff,
-                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
-                s_step=s_step,
-                p_norm_integral=p_norm_integral
-            )
-
-            water_LperH = distribute_drawoffs(
-                drawoffs=drawoffs,
-                p_drawoffs=p_drawoffs,
-                p_norm_integral=p_norm_integral,
-                s_step=s_step
-            )
-
-            # drawoffs_shower, p_drawoffs = generate_drawoffs(
-            #     mean_vol_per_drawoff=8,
-            #     mean_drawoff_vol_per_day=25,
-            #     s_step=s_step,
-            #     p_norm_integral=p_norm_integral
-            # )
-            #
-            # water_LperH = distribute_drawoffs(
-            #     drawoffs=drawoffs,
-            #     p_drawoffs=p_drawoffs,
-            #     p_norm_integral=p_norm_integral,
-            #     s_step=s_step
-            # )
-
-        elif normalize_mode == 'max':
-
-            # PyCity algorythm, probabilities are scaled to their max
-
-            max_p_final = max(p_final)
-            p_norm = [float(i) / max_p_final for i in p_final]
-
-            average_profile = average_profile * 365
-
-            for step in range(365 * timesteps_day):
-
-                if random.random() < p_norm[step]:
-
-                    water_t = random.gauss(average_profile[step], sigma=114.33)
-                    water_LperH.append(abs(water_t))
-                else:
-                    water_LperH.append(0)
+    water_LperH = distribute_drawoffs(
+        drawoffs=drawoffs,
+        p_drawoffs=p_drawoffs,
+        p_norm_integral=p_norm_integral,
+        s_step=s_step
+    )
 
     # Plot
     dhw_demand = compute_heat_and_plot_demand(
@@ -437,6 +407,71 @@ def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
     )
 
     return dhw_demand, water_LperH
+
+
+def distribute_average_profile(average_profile, s_step, p_final):
+    """
+    distribute the average profile.
+
+    :param average_profile:
+    :param s_step:
+    :param p_final:
+    :return:
+    """
+
+    average_profile = average_profile * 365
+
+    timesteps_day = int(24 * 3600 / s_step)
+
+    water_LperH = []
+
+    for step in range(365 * timesteps_day):
+
+        if random.random() < p_final[step]:
+
+            water_t = random.gauss(average_profile[step], sigma=114.33)
+            water_LperH.append(abs(water_t))
+        else:
+            water_LperH.append(0)
+
+    return water_LperH
+
+
+def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
+    """
+    Takes the probabilities of a weekday and a weekendday and generates a
+    list of yearly probabilities by adding a seasonal probability factor.
+    The seasonal factor is a sine-function, like in DHWcalc.
+
+    :param initial_day: int:    0: Mon, 1: Tue, 2: Wed, 3: Thur, 4: Fri,
+                                5 : Sat, 6 : Sun
+    :param p_weekend:   list:   probabilities of a weekend day
+    :param p_weekday:   list:   probabilities of a weekday
+    :param s_step:      int:    seconds within a timestep
+
+    :return: p_final:   list:   probabilities of a full year
+    """
+
+    p_final = []
+    timesteps_day = int(24 * 3600 / s_step)
+
+    for day in range(365):
+
+        # Is the current day on a weekend?
+        if (day + initial_day) % 7 >= 5:
+            p_day = p_weekend
+        else:
+            p_day = p_weekday
+
+        # Compute seasonal factor
+        arg = math.pi * (2 / 365 * day - 1 / 4)
+        probability_season = 1 + 0.1 * np.cos(arg)
+
+        for step in range(timesteps_day):
+            probability = p_day[step] * probability_season
+            p_final.append(probability)
+
+    return p_final
 
 
 def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
@@ -478,10 +513,9 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
 
 def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
                       s_step, p_norm_integral):
-
     # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
 
-    av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step     # in L/h
+    av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
 
     mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
 
@@ -515,7 +549,7 @@ def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
 
             mu_zeros = statistics.mean(drawoffs_new)
 
-            if mu_zeros/mu_initial > 1.01:
+            if mu_zeros / mu_initial > 1.01:
                 raise Exception("changing the negative values in the drawoffs "
                                 "list to zeros changes the Mean Value by more "
                                 "than 1%. Please choose a different standard "
@@ -545,7 +579,6 @@ def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
 
     p_drawoffs = [random.uniform(min_rand, max_rand) for i in drawoffs]
 
-
     return drawoffs, p_drawoffs
 
 
@@ -569,6 +602,20 @@ def normalize_and_sum_list(lst):
         lst_norm_integral.append(current_sum)
 
     return lst_norm_integral
+
+
+def normalize_list_to_max(lst):
+    """
+    takes a list and normalizes it based on the max of all list elements.
+
+    :param lst:                 list:   input list
+    :return: lst_norm_integral: list    output list
+    """
+
+    max_lst = max(lst)
+    lst_norm = [float(element) / max_lst for element in lst]
+
+    return lst_norm
 
 
 def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
@@ -621,7 +668,6 @@ def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
 
 
 def plot_average_profiles_pycity(save_fig=False):
-
     profiles_path = Path.cwd() / 'dhw_stochastical.xlsx'
     profiles = {"we": {}, "wd": {}}
     book = xlrd.open_workbook(profiles_path)
@@ -674,9 +720,9 @@ def plot_average_profiles_pycity(save_fig=False):
 
 
 def compute_heat_and_plot_demand(method, s_step, water_LperH,
-                                  plot_demand=False, start_plot='2019-02-01',
-                                  end_plot='2019-02-05', temp_dT=35,
-                                  print_stats=False, save_fig=False):
+                                 plot_demand=False, start_plot='2019-02-01',
+                                 end_plot='2019-02-05', temp_dT=35,
+                                 print_stats=False, save_fig=False):
     """
     Takes a timeseries of waterflows per timestep in [L/h]. Computes a
     DHW Demand series in [kWh]. Computes additional stats an optionally
@@ -709,11 +755,10 @@ def compute_heat_and_plot_demand(method, s_step, water_LperH,
     av_daily_water = round(yearly_water_demand / 365, 1)
     av_daily_water_lst = [av_daily_water for i in water_LperH]  # L/day
     max_water_flow = round(max(water_LperH), 1)  # in L/h
-    yearly_dhw_demand = round(sum(dhw) * s_step / (3600 * 1000),  1)  # kWh
+    yearly_dhw_demand = round(sum(dhw) * s_step / (3600 * 1000), 1)  # kWh
     max_dhw_heat_flow = round(max(dhw) / 1000, 1)  # in kW
 
     if print_stats:
-
         print("Yearly drinking water demand from DHWcalc Alias is {:.2f} L"
               " with a maximum of {:.2f} L/h".format(yearly_water_demand,
                                                      max_water_flow))
