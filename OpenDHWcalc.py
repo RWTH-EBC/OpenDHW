@@ -8,6 +8,8 @@ import xlrd
 import math
 import statistics
 import random
+from scipy.stats import beta
+import pylab
 import matplotlib.dates as mdates
 
 
@@ -272,11 +274,14 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
 
 
 def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
-                                       s_step, normalize_mode='max',
-                                       initial_day=0, temp_dT=35,
-                                       print_stats=True, plot_demand=True,
-                                       start_plot='2019-01-01',
-                                       end_plot='2019-01-03', save_fig=False):
+                                      s_step, weekend_weekday_factor=1.2,
+                                      mean_vol_per_drawoff=8,
+                                      mean_drawoff_vol_per_day=200,
+                                      normalize_mode='max', initial_day=0,
+                                      temp_dT=35, print_stats=True,
+                                      plot_demand=True,
+                                      start_plot='2019-01-01',
+                                      end_plot='2019-01-03', save_fig=False):
 
     timesteps_day = int(24 * 3600 / s_step)
 
@@ -293,7 +298,7 @@ def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
     p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
         p_weekday=p_wd,
         p_weekend=p_we,
-        factor=1.2
+        factor=weekend_weekday_factor
     )
 
     average_profile = generate_average_daily_profile(
@@ -373,8 +378,8 @@ def generate_dhw_profile_open_dhwcalc(normalize_probability_distribution,
             p_norm_integral = normalize_and_sum_list(lst=p_final)
 
             drawoffs, p_drawoffs = generate_drawoffs(
-                mean_vol_per_drawoff=8,
-                mean_drawoff_vol_per_day=200,
+                mean_vol_per_drawoff=mean_vol_per_drawoff,
+                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
                 s_step=s_step,
                 p_norm_integral=p_norm_integral
             )
@@ -471,7 +476,7 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
     return water_LperH
 
 
-def generate_drawoffs(mean_vol_per_drawoff, mean_drawoff_vol_per_day,
+def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
                       s_step, p_norm_integral):
 
     # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
@@ -487,37 +492,59 @@ def generate_drawoffs(mean_vol_per_drawoff, mean_drawoff_vol_per_day,
     drawoffs = []
     mu_initial = 0
 
-    # drawoff flow rate has to be positive. try 4 times
-    for try_i in range(4):
+    if method == 'gauss':
 
-        drawoffs = [random.gauss(mu, sigma=sig) for i in range(total_drawoffs)]
-        mu_initial = statistics.mean(drawoffs)
+        # drawoff flow rate has to be positive. try 4 times
+        for try_i in range(4):
 
-        if min(drawoffs) >= 0:
-            break
+            drawoffs = [random.gauss(mu, sig) for i in range(total_drawoffs)]
+            mu_initial = statistics.mean(drawoffs)
 
-    # if its still has negative values after 4 tries, make 0's from negatives
-    if min(drawoffs) <= 0:
-        drawoffs_new = []
-        for event in drawoffs:
-            if event >= 0:
-                drawoffs_new.append(event)
-            if event < 0:
-                drawoffs_new.append(0)
-        drawoffs = drawoffs_new
+            if min(drawoffs) >= 0:
+                break
 
-        mu_zeros = statistics.mean(drawoffs_new)
+        # if still negative values after 4 tries, make 0's from negatives
+        if min(drawoffs) <= 0:
+            drawoffs_new = []
+            for event in drawoffs:
+                if event >= 0:
+                    drawoffs_new.append(event)
+                if event < 0:
+                    drawoffs_new.append(0)
+            drawoffs = drawoffs_new
 
-        if mu_zeros/mu_initial > 1.01:
-            raise Exception("changing the negative values in the drawoffs "
-                            "list to zeros changes the Mean Value by more "
-                            "than 1%. Please choose a different standard "
-                            "deviation.")
+            mu_zeros = statistics.mean(drawoffs_new)
+
+            if mu_zeros/mu_initial > 1.01:
+                raise Exception("changing the negative values in the drawoffs "
+                                "list to zeros changes the Mean Value by more "
+                                "than 1%. Please choose a different standard "
+                                "deviation.")
+    elif method == 'beta':
+        # https://en.wikipedia.org/wiki/Beta_distribution
+        # https://stats.stackexchange.com/questions/317729/is-the-gaussian-distribution-a-specific-case-of-the-beta-distribution
+        # https://stackoverflow.com/a/62364837
+        # https://www.vosesoftware.com/riskwiki/NormalapproximationtotheBetadistribution.php
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.beta.html
+
+        max_drawoff_flow_rate = 1200
+        min_drawoff_flow_rate = 1
+
+        a, b = 5, 5
+        dist = beta(a, b)
+
+        drawoffs = min_drawoff_flow_rate + dist.rvs(size=total_drawoffs) * (
+                max_drawoff_flow_rate - min_drawoff_flow_rate)
+
+    else:
+        raise Exception("Unkown method to generate drawoffs. choose Gauss or "
+                        "Beta Distribution.")
 
     min_rand = min(p_norm_integral)
     max_rand = max(p_norm_integral)
 
     p_drawoffs = [random.uniform(min_rand, max_rand) for i in drawoffs]
+
 
     return drawoffs, p_drawoffs
 
