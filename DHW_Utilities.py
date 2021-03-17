@@ -8,33 +8,38 @@ import matplotlib.dates as mdates
 import seaborn as sns
 
 
-def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=300, dT_stor=55, dT_threshhold=10,
-                                     Qcon_flow_max=5000, plot_cum_demand=False, with_losses=True,
-                                     start_plot='2019-08-08-18', end_plot='2019-08-09-09',
-                                     save_fig=True):
+def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600,
+                                     V_stor=300, dT_stor=55, dT_threshhold=10,
+                                     Qcon_flow_max=5000,
+                                     plot_cum_demand=False, with_losses=True,
+                                     start_plot='2019-08-08-18',
+                                     end_plot='2019-08-09-09', save_fig=True):
     """
-    Converts the input DHW-Profile without a DHW-Storage to a DHW-Profile with a DHW-Storage.
-    The output profile looks as if the HP would not supply the DHW-load directly but would rather re-heat
-    the DHW-Storage, which has dropped below a certain dT Threshold.
-    The advantage is, that no storage model has to be part of a dynamic simulation,
-    although the heatpump still acts as if a storage is supplied. Based on DIN EN 12831-3.
+    Converts the input DHW-Profile without a DHW-Storage to a DHW-Profile
+    with a DHW-Storage. The output profile looks as if the HP would not
+    supply the DHW-load directly but would rather re-heat the DHW-Storage,
+    which has dropped below a certain dT Threshold. The advantage is, that no
+    storage model has to be part of a dynamic simulation, although the
+    heatpump still acts as if a storage is supplied. Based on DIN EN 12831-3.
 
     :param dhw_demand:      List, stores the DHW-demand profile in [W] per Timestep
     :param dir_output:      Directory where to save the plot
-    :param s_step:          Seconds within a timestep. Usual Values are 3600 (1h timesteps) or 600 (10min timesteps)
+    :param s_step:          Seconds within a timestep. f.e. 60, 600, 3600
     :param V_stor:          Storage Volume in Liters
     :param dT_stor:         max dT in Storage
     :param dT_threshhold:   max dT Drop before Storage needs to be re-heated
-    :param Qcon_flow_max:   Heat Flow Rate at the Heatpump when refilling the Storage in [W]
-    :param plot_cum_demand: Plot the cumulative "Summenliniendiagram" as described in DIN DIN EN 12831-3
+    :param Qcon_flow_max:   Heat Flow Rate at the Heatpump when refilling the
+                            Storage in [W]
+    :param plot_cum_demand: Plot the cumulative "Summenliniendiagram" as
+                            described in DIN DIN EN 12831-3
     :param with_losses:     Boolean if the storage should have losses
-    :param start_plot:      Pandas Datetime where the Plot should start, e.g. '2019-08-02'
-    :param end_plot:        Pandas Datetime where the plot should end, e.g. '2019-08-03'
-    :param save_fig:        decide to save the fig as a pdf and png in dir_output
+    :param start_plot:      e.g. '2019-08-02'
+    :param end_plot:        e.g. '2019-08-03'
+    :param save_fig:        decide to save the fig as a pdf and png
     :return: storage_load:  DHW-profile that re-heats a storage.
     """
 
-    # convert the DHW demand from Watt to Joule by multiplying by the timestep width
+    # convert the DHW demand from Watt to Joule
     dhw_demand = [dem_step * s_step for dem_step in dhw_demand]
 
     # --------- Storage Data ---------------
@@ -57,7 +62,7 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
     for t_step, dem_step in enumerate(dhw_demand, start=0):
         storage_level.append(Q_storr_curr)
         if with_losses:
-            Q_loss = (Q_storr_curr * 0.001 * s_step) / 3600  # 0,1% Loss per Hour
+            Q_loss = (Q_storr_curr * 0.001 * s_step) / 3600  # 0,1% Loss/Hour
         else:
             Q_loss = 0
         loss_load.append(Q_loss)
@@ -66,14 +71,16 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
         if len(storage_load) == 0:
             Q_storr_curr = Q_storr_curr - dem_step - Q_loss
         else:
-            Q_storr_curr = Q_storr_curr - dem_step - Q_loss + storage_load[t_step - 1]
+            Q_storr_curr = Q_storr_curr - dem_step - Q_loss\
+                           + storage_load[t_step - 1]
 
         if Q_storr_curr >= Q_full:  # storage full, dont fill it!
             fill_storage = False
             storage_load.append(0)
             continue
 
-        # storage above dT Threshhold, but not full. depending if is charging or discharging, storage_load is appended
+        # storage above dT Threshhold, but not full.
+        # depending if is charging or discharging, storage_load is appended
         elif Q_storr_curr > Q_full - dQ_threshhold:
             if fill_storage:
                 storage_load.append(Q_dh_timestep)
@@ -89,11 +96,12 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
     print("Total DHW Demand is {:.2f} kWh".format(sum(dhw_demand) / (3600 * 1000)))
     print("Total Storage Demand is {:.2f} kWh".format(sum(storage_load) / (3600 * 1000)))
     diff = sum(dhw_demand) + sum(loss_load) - sum(storage_load)
-    print("Difference between dhw demand and storage load ist {:.2f} kWh".format(diff / (3600 * 1000)))
+    print("Difference between dhw demand and storage load ist{:.2f} kWh".format(diff / (3600 * 1000)))
     if diff < 0:
         print("More heat than dhw demand is added to the storage in loss-less mode!")
 
-    # Count number of clusters of non-zero values ("peaks"). One Peak is comprised by 2 HP mode switches.
+    # Count number of clusters of non-zero values ("peaks").
+    # One Peak is comprised by 2 HP mode switches.
     dhw_peaks = int(np.diff(np.concatenate([[0], dhw_demand, [0]]) == 0).sum() / 2)
     stor_peaks = int(np.diff(np.concatenate([[0], storage_load, [0]]) == 0).sum() / 2)
     print("The Storage reduced the number of DHW heating periods from {} to {}, which is equal to "
@@ -136,9 +144,12 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
         rwth_red_50 = "#E69679"
         rwth_yellow = "#FFED00"
         rwth_yellow_50 = "#FFF59B"
-        rwth_colors_all = [rwth_blue, rwth_green, rwth_orange, rwth_red, rwth_yellow, rwth_blue_50, rwth_green_50,
+        rwth_colors_all = [rwth_blue, rwth_green, rwth_orange, rwth_red,
+                           rwth_yellow, rwth_blue_50, rwth_green_50,
                            rwth_orange_50, rwth_red_50, rwth_yellow_50]
-        sns.set_palette(sns.color_palette(rwth_colors_all))  # does nothing? specify colors with palette=[c1, c2..]
+
+        # set palette does nothing? specify colors with palette=[c1, c2..]
+        sns.set_palette(sns.color_palette(rwth_colors_all))
 
         if platform.system() == 'Darwin':
             dir_home = "/Users/jonasgrossmann"
@@ -152,7 +163,8 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
         sns.set_context("paper")
 
         # set date range to simplify plot slicing
-        date_range = pd.date_range(start='2019-01-01', end='2020-01-01', freq=str(s_step) + 'S')
+        date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                                   freq=str(s_step) + 'S')
         date_range = date_range[:-1]
 
         # convert Joule values to kWh or kW
@@ -188,19 +200,22 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
         fig, ax1 = plt.subplots()
         fig.tight_layout()
 
-        ax1_data = dhw_demand_sumline_df[['sum DHW Demand', 'sum Storage Load']][start_plot:end_plot]
-        ax1 = sns.lineplot(data=ax1_data.resample(resample_delta).mean(), dashes=[(6, 2), (6, 2)], linewidth=1.2,
+        ax1_data = dhw_demand_sumline_df[['sum DHW Demand','sum Storage Load']][start_plot:end_plot]
+        ax1 = sns.lineplot(data=ax1_data.resample(resample_delta).mean(),
+                           dashes=[(6, 2), (6, 2)], linewidth=1.2,
                            palette=[rwth_blue, rwth_orange])
         ax1.grid(False)
 
         ax2 = ax1.twinx()
         ax2_data = dhw_demand_sumline_df[['DHW Demand', 'Storage Load']][start_plot:end_plot]
-        ax2 = sns.lineplot(data=ax2_data.resample(resample_delta).mean(), dashes=False, linewidth=0.7,
+        ax2 = sns.lineplot(data=ax2_data.resample(resample_delta).mean(),
+                           dashes=False, linewidth=0.7,
                            palette=[rwth_blue, rwth_orange])
 
         ax3 = ax1.twinx()
         ax3_data = dhw_demand_sumline_df[['Losses']][start_plot:end_plot]
-        ax3 = sns.lineplot(data=ax3_data.resample(resample_delta).mean(), dashes=False, linewidth=0.5,
+        ax3 = sns.lineplot(data=ax3_data.resample(resample_delta).mean(),
+                           dashes=False, linewidth=0.5,
                            palette=[rwth_red])
         ymin, ymax = ax3.get_ylim()
         ax3.set_ylim(ymin, ymax * 1.5)
@@ -227,16 +242,19 @@ def convert_dhw_load_to_storage_load(dhw_demand, dir_output, s_step=600, V_stor=
         formatter.formats = ['%y', '%b', '%d', '%H:%M', '%H:%M', '%S.%f', ]
         formatter.zero_formats = [''] + formatter.formats[:-1]
         formatter.zero_formats[3] = '%d-%b'
-        formatter.offset_formats = ['', '%Y', '%b %Y', '%d %b %Y', '%d %b %Y', '%d %b %Y %H:%M', ]
+        formatter.offset_formats = ['', '%Y', '%b %Y',
+                                    '%d %b %Y', '%d %b %Y', '%d %b %Y %H:%M', ]
         ax1.xaxis.set_major_locator(locator)
         ax1.xaxis.set_major_formatter(formatter)
 
-        plt.title('Demand ({} Peaks) and Supply ({} Peaks)'.format(dhw_peaks, stor_peaks))
+        plt.title('Demand ({} Peaks) and Supply ({} Peaks)'.format(dhw_peaks,
+                                                                   stor_peaks))
         plt.show()
 
         if save_fig:
             fig.savefig(os.path.join(dir_output + "/SummenlineinDiagramm.pdf"))
-            fig.savefig(os.path.join(dir_output + "/SummenlineinDiagramm.png"), dpi=600)
+            fig.savefig(os.path.join(dir_output +
+                                     "/SummenlineinDiagramm.png"), dpi=600)
 
     # Output Unit of storage load should be equal to Input Unit of DHW demand
     storage_load = [stor_step / s_step for stor_step in storage_load]
