@@ -511,8 +511,34 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
     return water_LperH
 
 
-def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
-                      s_step, p_norm_integral):
+def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
+                      mean_drawoff_vol_per_day=200, method='beta'):
+    """
+    Generates two lists. First, the "drawoffs" list, with the darwoff events as
+    flowrate entries in Liter/hour.  Second, the "p_drawoffs" list, which has
+    the same length as the "drawoffs" lists but contains random values,
+    between the minimum and the maximum of "p_norm_integral". These are
+    usually values between 0 and 1, following the convention of DHWcalc.
+
+    The drawoffs are generated based on some key parameters, like the mean
+    water volume consumed per drawoff and the mean water volume consumed per
+    day.
+
+    Then, the drawoffs are generated following either a Gauss Distribution (
+    like describesd in the DHWcalc paper) or a beta distribution. The
+    advantage of the Beta Distribution is the ability to directly set values
+    for the minimum and the maximum value. If the a & b paremeter of the beta
+    distribtuion are both set to 5, the beta distribtuion looks very similar
+    to the Gauss distribtuion and can thus be used as a substitute.
+
+    :param s_step:                      int     seconds within a timestep
+    :param p_norm_integral:             list    min and max values taken
+    :param mean_vol_per_drawoff:        int     mean volume per drawpff
+    :param mean_drawoff_vol_per_day:    int     mean volume drawn off per day
+    :param method:                      string  "gauss" or "beta"
+    :return:    drawoffs:               list    drawoff events in [L/h]
+                p_drawoffs:             list    probabilities 0...1
+    """
     # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
 
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
@@ -521,12 +547,28 @@ def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
 
     total_drawoffs = int(mean_no_drawoffs_per_day * 365)
 
-    mu = av_drawoff_flow_rate
-    sig = av_drawoff_flow_rate / 3
-    drawoffs = []
-    mu_initial = 0
+    if method == 'beta':
+        # https://en.wikipedia.org/wiki/Beta_distribution
+        # https://stats.stackexchange.com/questions/317729/is-the-gaussian-distribution-a-specific-case-of-the-beta-distribution
+        # https://stackoverflow.com/a/62364837
+        # https://www.vosesoftware.com/riskwiki/NormalapproximationtotheBetadistribution.php
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.beta.html
 
-    if method == 'gauss':
+        max_drawoff_flow_rate = 1200
+        min_drawoff_flow_rate = 6
+
+        a, b = 5, 5
+        dist = beta(a, b)
+
+        drawoffs = min_drawoff_flow_rate + dist.rvs(size=total_drawoffs) * (
+                max_drawoff_flow_rate - min_drawoff_flow_rate)
+
+    elif method == 'gauss':
+
+        mu = av_drawoff_flow_rate       # mean
+        sig = av_drawoff_flow_rate / 4  # standard deviation
+        drawoffs = []  # in [L/h]
+        mu_initial = 0
 
         # drawoff flow rate has to be positive. try 4 times
         for try_i in range(4):
@@ -554,21 +596,6 @@ def generate_drawoffs(method, mean_vol_per_drawoff, mean_drawoff_vol_per_day,
                                 "list to zeros changes the Mean Value by more "
                                 "than 1%. Please choose a different standard "
                                 "deviation.")
-    elif method == 'beta':
-        # https://en.wikipedia.org/wiki/Beta_distribution
-        # https://stats.stackexchange.com/questions/317729/is-the-gaussian-distribution-a-specific-case-of-the-beta-distribution
-        # https://stackoverflow.com/a/62364837
-        # https://www.vosesoftware.com/riskwiki/NormalapproximationtotheBetadistribution.php
-        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.beta.html
-
-        max_drawoff_flow_rate = 1200
-        min_drawoff_flow_rate = 1
-
-        a, b = 5, 5
-        dist = beta(a, b)
-
-        drawoffs = min_drawoff_flow_rate + dist.rvs(size=total_drawoffs) * (
-                max_drawoff_flow_rate - min_drawoff_flow_rate)
 
     else:
         raise Exception("Unkown method to generate drawoffs. choose Gauss or "
@@ -620,7 +647,7 @@ def normalize_list_to_max(lst):
 
 def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
     """
-    Generates probabilites for a day with 6 periods. Corresponds to the mode
+    Generates probabilities for a day with 6 periods. Corresponds to the mode
     "step function for weekdays and weekends" in DHWcalc and uses the same
     standard values. Each Day starts at 0:00. Steps in hours. Sum of steps
     has to be 24. Sum of probabilites has to be 1.
