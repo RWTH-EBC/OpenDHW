@@ -11,7 +11,11 @@ def main():
 
     # generate time-series with OpenDHWcalc
     x, water_open_dhw_60 = OpenDHWcalc.generate_dhw_profile_open_dhwcalc(
-        s_step=s_step
+        s_step=s_step,
+        weekend_weekday_factor=1.2,
+        mean_vol_per_drawoff=8,
+        mean_drawoff_vol_per_day=200,
+        initial_day=0,
     )
 
     # Load time-series from DHWcalc
