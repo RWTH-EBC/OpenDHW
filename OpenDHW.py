@@ -11,10 +11,15 @@ import random
 from scipy.stats import beta
 import matplotlib.dates as mdates
 
+# RWTH colours
+rwth_blue = "#00549F"
+rwth_red = "#CC071E"
+
 
 def compare_generators(first_method, first_series_LperH, second_method,
                        second_series_LperH, s_step, start_plot='2019-03-01',
-                       end_plot='2019-03-08', save_fig=False):
+                       end_plot='2019-03-08', plot_date_slice=True,
+                       plot_distribution=True, save_fig=False):
     """
     Compares two methods of computing the water flow time series by means of
     a subplot.
@@ -62,103 +67,145 @@ def compare_generators(first_method, first_series_LperH, second_method,
     # sns.set_style("white")
     sns.set_context("paper")
 
-    # set date range to simplify plot slicing
-    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
-                               freq=str(s_step) + 'S')
-    date_range = date_range[:-1]
+    if plot_date_slice:
 
-    # make dataframe for plotting with seaborn
-    first_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(first_method):
-                                      first_series_LperH,
-                                  'Yearly av. Demand [{} L/day]'.format(
-                                      first_series_av_daily_water):
-                                      first_series_av_daily_water_lst},
-                                 index=date_range)
+        # set date range to simplify plot slicing
+        date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                                   freq=str(s_step) + 'S')
+        date_range = date_range[:-1]
 
-    second_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(second_method):
-                                       second_series_LperH,
-                                   'Yearly av. Demand [{} L/day]'.format(
-                                       second_series_av_daily_water):
-                                       second_series_av_daily_water_lst},
-                                  index=date_range)
+        # make dataframe for plotting with seaborn
+        first_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(first_method):
+                                          first_series_LperH,
+                                      'Yearly av. Demand [{} L/day]'.format(
+                                          first_series_av_daily_water):
+                                          first_series_av_daily_water_lst},
+                                     index=date_range)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1)
-    fig.tight_layout()
+        second_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(second_method):
+                                           second_series_LperH,
+                                       'Yearly av. Demand [{} L/day]'.format(
+                                           second_series_av_daily_water):
+                                           second_series_av_daily_water_lst},
+                                      index=date_range)
 
-    ax1 = sns.lineplot(ax=ax1, data=first_plot_df[start_plot:end_plot],
-                       linewidth=1.0, palette=[rwth_blue, rwth_red])
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        fig.tight_layout()
 
-    ax1.set_title('Water time-series from {}, timestep = {} s\n Yearly Demand ='
-                  '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
-        first_method, s_step, first_series_yearly_water_demand,
-        first_series_max_water_flow, first_series_non_zeros))
+        ax1 = sns.lineplot(ax=ax1, data=first_plot_df[start_plot:end_plot],
+                           linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-    ax1.legend(loc="upper left")
+        ax1.set_title('Water time-series from {}, timestep = {} s\n Yearly Demand ='
+                      '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
+            first_method, s_step, first_series_yearly_water_demand,
+            first_series_max_water_flow, first_series_non_zeros))
 
-    ax2 = sns.lineplot(ax=ax2, data=second_plot_df[start_plot:end_plot],
-                       linewidth=1.0, palette=[rwth_blue, rwth_red])
+        ax1.legend(loc="upper left")
 
-    ax2.set_title('Water time-series from {}, timestep = {} s\n Yearly Water '
-                  '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
-        second_method, s_step, second_series_yearly_water_demand,
-        second_series_max_water_flow, second_series_non_zeros))
+        ax2 = sns.lineplot(ax=ax2, data=second_plot_df[start_plot:end_plot],
+                           linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-    ax2.legend(loc="upper left")
+        ax2.set_title('Water time-series from {}, timestep = {} s\n Yearly Water '
+                      '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
+            second_method, s_step, second_series_yearly_water_demand,
+            second_series_max_water_flow, second_series_non_zeros))
 
-    plt.show()
+        ax2.legend(loc="upper left")
 
-    save_fig = True
-    if save_fig:
-        dir_output = Path.cwd() / "plots"
-        dir_output.mkdir(exist_ok=True)
-        fig.savefig(dir_output / "Demand_Comparision.pdf")
+        plt.show()
 
-    return fig
+        if save_fig:
+            dir_output = Path.cwd() / "plots"
+            dir_output.mkdir(exist_ok=True)
+            fig.savefig(dir_output / "Demand_Comparision.pdf")
+
+    if plot_distribution:
+
+        # get non-zero values of the proule
+        drawoffs_first_series = [i for i in first_series_LperH if i > 0]
+        drawoffs_second_series = [i for i in second_series_LperH if i > 0]
+
+        # compute some stats
+        drawoffs_mean_no1 = round(statistics.mean(drawoffs_first_series), 2)
+        drawoffs_stdev_no1 = round(statistics.stdev(drawoffs_first_series), 2)
+
+        drawoffs_mean_no2 = round(statistics.mean(drawoffs_second_series), 2)
+        drawoffs_stdev_no2 = round(statistics.stdev(drawoffs_second_series), 2)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        fig.tight_layout()
+
+        # plot the distribution
+        # https://seaborn.pydata.org/generated/seaborn.displot.html
+        ax1 = sns.histplot(ax=ax1, data=drawoffs_first_series, kde=True)
+        ax2 = sns.histplot(ax=ax2, data=drawoffs_second_series, kde=True)
+
+        ax1.set_title('Water time-series from {}, timestep = {} s Yearly '
+                      'Demand = {} L, \n No. Drawoffs = {}, Mean = {} L/h, '
+                      'Standard Deviation = {} L/h'.format(
+            first_method, s_step, first_series_yearly_water_demand,
+            first_series_non_zeros, drawoffs_mean_no1, drawoffs_stdev_no1))
+
+        ax2.set_title('Water time-series from {}, timestep = {} s Yearly '
+                      'Demand = {} L, \n No. Drawoffs = {}, Mean = {} L/h, '
+                      'Standard Deviation = {} L/h'.format(
+            second_method, s_step, second_series_yearly_water_demand,
+            second_series_non_zeros, drawoffs_mean_no2, drawoffs_stdev_no2))
+
+        plt.show()
+
+    return
 
 
-def import_from_dhwcalc(s_step, temp_dT=35, print_stats=True,
-                        plot_demand=True, start_plot='2019-08-01',
-                        end_plot='2019-08-03', save_fig=True):
+def import_from_dhwcalc(s_step, categories):
     """
-    DHWcalc yields Volume Flow TimeSeries (in Liters per hour). To get
-    Energyflows -> Q = Vdot * rho * cp * dT
+    DHWcalc yields Volume Flow TimeSeries (in Liters per hour).
 
     :param  s_step:     int:    resolution of output file in seconds
-    :param  temp_dT:    int:    average Temperature Difference between
-                                Freshwater and DHW
-
-
+    :param  categories  int:    either '1' or '4', see DHWcalc settings
 
     :return dhw_demand: list:   each timestep contains the Energyflow in [W]
     """
 
-    # timeseries are 200 L/d -> 73000 L/a (for 5 people, each 40 L/d)
-    if s_step == 60:
+    # timeseries are 200 L/d -> 73000 L/a (for 5 people, each person 40 L/d)
+    if s_step == 60 and categories == 1:
         dhw_file = "DHWcalc_Files/DHWcalc_200L_1min_1cat_step_functions.txt"
-    elif s_step == 600:
+    elif s_step == 600 and categories == 1:
         dhw_file = "DHWcalc_Files/DHWcalc_200L_10min_1cat_step_functions.txt"
+    elif s_step == 60 and categories == 4:
+        dhw_file = "DHWcalc_Files/200L_1min_4cat_step_functions" \
+                   "/200L_1min_4cat_step_functions.txt"
+    elif s_step == 600 and categories == 4:
+        dhw_file = "DHWcalc_Files/200L_10min_4cat_step_functions" \
+                   "/200L_10min_4cat_step_functions.txt"
     else:
-        raise Exception("Unkown Time Step for DHWcalc")
+        raise Exception("Unkown Time Step or #Categories for DHWcalc")
+
     dhw_profile = Path.cwd() / dhw_file
 
     # Flowrate in Liter per Hour in each Step
     water_LperH = [int(word.strip('\n')) for word in
                    open(dhw_profile).readlines()]  # L/h each step
 
-    # Plot
-    dhw_demand = compute_heat_and_plot_demand(
-        method='DHWcalc',
-        s_step=s_step,
-        water_LperH=water_LperH,
-        start_plot=start_plot,
-        end_plot=end_plot,
-        temp_dT=temp_dT,
-        print_stats=print_stats,
-        plot_demand=plot_demand,
-        save_fig=save_fig
-    )
+    return water_LperH
 
-    return dhw_demand, water_LperH
+
+def analyze_dhw_profile(dhw_profile):
+
+    # get non-zero values of the proule
+    drawoffs = [i for i in dhw_profile if i > 0]
+
+    # compute some stats
+    drawoffs_mean = round(statistics.mean(drawoffs), 2)
+    drawoffs_stdev = round(statistics.stdev(drawoffs), 2)
+
+    # plot the distribution
+    # https://seaborn.pydata.org/generated/seaborn.displot.html
+    ax = sns.displot(drawoffs, kde=True, palette=[rwth_blue, rwth_red])
+    ax.set(title="Mean = {} L/h, Standard Deviation = {} L/h".format(
+        drawoffs_mean, drawoffs_stdev))
+
+    plt.show()
 
 
 def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
@@ -344,13 +391,10 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
     return dhw_demand, water_LperH
 
 
-def generate_dhw_profile_open_dhw(s_step, weekend_weekday_factor=1.2,
-                                  drawoff_method='beta', mean_vol_per_drawoff=8,
-                                  mean_drawoff_vol_per_day=200,
-                                  initial_day=0, temp_dT=35,
-                                  print_stats=True, plot_demand=True,
-                                  start_plot='2019-01-01',
-                                  end_plot='2019-01-03', save_fig=False):
+def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
+                         drawoff_method='beta', mean_vol_per_drawoff=8,
+                         mean_drawoff_vol_per_day=200,
+                         initial_day=0):
     """
     Generates a DHW profile. The generation is split up in different
     functions and generally follows the methodology described in the DHWcalc
@@ -369,19 +413,12 @@ def generate_dhw_profile_open_dhw(s_step, weekend_weekday_factor=1.2,
     7)  Optionally, the profile can be plotted and the associated heat
         computed.
 
-
     :param s_step:
     :param weekend_weekday_factor:
     :param drawoff_method:
     :param mean_vol_per_drawoff:
     :param mean_drawoff_vol_per_day:
     :param initial_day:
-    :param temp_dT:
-    :param print_stats:
-    :param plot_demand:
-    :param start_plot:
-    :param end_plot:
-    :param save_fig:
     :return:
     """
 
@@ -425,20 +462,7 @@ def generate_dhw_profile_open_dhw(s_step, weekend_weekday_factor=1.2,
         s_step=s_step
     )
 
-    # Plot
-    dhw_demand = compute_heat_and_plot_demand(
-        method='DHWcalc_Alias',
-        s_step=s_step,
-        water_LperH=water_LperH,
-        start_plot=start_plot,
-        end_plot=end_plot,
-        temp_dT=temp_dT,
-        print_stats=print_stats,
-        plot_demand=plot_demand,
-        save_fig=save_fig
-    )
-
-    return dhw_demand, water_LperH
+    return water_LperH
 
 
 def distribute_average_profile(average_profile, s_step, p_final):
@@ -544,8 +568,7 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
 
 
 def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
-                      mean_drawoff_vol_per_day=200, method='beta',
-                      plot_drawoffs=True):
+                      mean_drawoff_vol_per_day=200, method='beta'):
     """
     Generates two lists. First, the "drawoffs" list, with the darwoff events as
     flowrate entries in Liter/hour.  Second, the "p_drawoffs" list, which has
@@ -575,7 +598,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
 
-    sdt_dev_drawoff_flow_rate = 120
+    sdt_dev_drawoff_flow_rate = 120  # in L/h
 
     mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
 
@@ -652,16 +675,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
               "Min-Value = {} L/h".format(drawoffs_min, error_min * 100,
                                           min_drawoff_flow_rate))
 
-        if plot_drawoffs:
-            no_bins = int(total_drawoffs/50)
-            his, bins = np.histogram(drawoffs, bins=no_bins, density=True)
-            plt.plot(bins[:-1], his, ".")
-            plt.xlabel("Drawoff Rates in [L/h] for {} bins".format(no_bins))
-            plt.ylabel("Probability density")
-            plt.grid()
-            plt.show()
-
-    elif method == 'gauss':
+    elif method == 'gauss_simple':
         # outdated, not reccomended to use
 
         mu = av_drawoff_flow_rate  # mean
@@ -695,6 +709,32 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
                                 "list to zeros changes the Mean Value by more "
                                 "than 1%. Please choose a different standard "
                                 "deviation.")
+
+    elif method == 'gauss_combined':
+        # as close as it gets to the DHWcalc Algorithm
+
+        mu = av_drawoff_flow_rate  # in L/h
+        sig = sdt_dev_drawoff_flow_rate  # in L/h
+
+        drawoffs = [random.gauss(mu, sig) for i in range(total_drawoffs)]
+
+        low_lim = mu - 2 * sig
+        up_lim = mu + 2 * sig
+
+        # cut gauss distribution
+        drawoffs = [i for i in drawoffs if i > low_lim and i < up_lim]
+
+        curr_no_drawoffs = len(drawoffs)
+        no_drawoffs_left = total_drawoffs - curr_no_drawoffs
+
+        noise = [random.randint(low_lim, max_drawoff_flow_rate) for i in
+                 range(no_drawoffs_left)]
+
+        drawoffs.extend(noise)
+
+        # ax = sns.displot(drawoffs, kde=True, palette=[rwth_blue, rwth_red])
+        # plt.show()
+
 
     else:
         raise Exception("Unkown method to generate drawoffs. choose Gauss or "
