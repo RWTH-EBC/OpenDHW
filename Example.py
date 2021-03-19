@@ -3,18 +3,19 @@ import OpenDHW
 
 # ------- Parameter Section ---------
 s_step = 60
-start_plot = '2019-03-01'
+start_plot = '2019-03-04'
 end_plot = '2019-03-08'
 
 
 def main():
 
-    # generate time-series with OpenDHWcalc
-    x, water_open_dhw_60 = OpenDHW.generate_dhw_profile_open_dhwcalc(
+    # generate time-series with OpenDHW
+    x, water_open_dhw_60 = OpenDHW.generate_dhw_profile_open_dhw(
         s_step=s_step,
         weekend_weekday_factor=1.2,
         mean_vol_per_drawoff=8,
         mean_drawoff_vol_per_day=200,
+        drawoff_method='beta',
         initial_day=0,
     )
 

@@ -289,7 +289,6 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
                                          print_stats=True, plot_demand=True,
                                          start_plot='2019-01-01',
                                          end_plot='2019-01-03', save_fig=False):
-
     p_we = generate_daily_probability_step_function(
         mode='weekend',
         s_step=s_step
@@ -345,13 +344,46 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
     return dhw_demand, water_LperH
 
 
-def generate_dhw_profile_open_dhwcalc(s_step, weekend_weekday_factor=1.2,
-                                      mean_vol_per_drawoff=8,
-                                      mean_drawoff_vol_per_day=200,
-                                      initial_day=0, temp_dT=35,
-                                      print_stats=True, plot_demand=True,
-                                      start_plot='2019-01-01',
-                                      end_plot='2019-01-03', save_fig=False):
+def generate_dhw_profile_open_dhw(s_step, weekend_weekday_factor=1.2,
+                                  drawoff_method='beta', mean_vol_per_drawoff=8,
+                                  mean_drawoff_vol_per_day=200,
+                                  initial_day=0, temp_dT=35,
+                                  print_stats=True, plot_demand=True,
+                                  start_plot='2019-01-01',
+                                  end_plot='2019-01-03', save_fig=False):
+    """
+    Generates a DHW profile. The generation is split up in different
+    functions and generally follows the methodology described in the DHWcalc
+    paper from Uni Kassel.
+
+    1)  Probabilities for weekdays and weekend-days are loaded (p_day).
+    2)  Probability of weekend-days is increased relative to weekdays (shift).
+    3)  Based on an initial day, the yearly probability distribution (p_final)
+        is generated. The seasonal influence is modelled by a sine-function.
+    4)  p_final is normalized and integrated. The sum over the year is thus
+        equal to 1 (p_norm_integral).
+    5)  Drawoffs are generated based on a Beta distribution. Additionally,
+        a list of random values bwtween 0 and 1 is generated.
+    6)  The drawoffs are distributed based on the random values into the
+        p_norm_integral space. The final yearly drawoff profile is returned.
+    7)  Optionally, the profile can be plotted and the associated heat
+        computed.
+
+
+    :param s_step:
+    :param weekend_weekday_factor:
+    :param drawoff_method:
+    :param mean_vol_per_drawoff:
+    :param mean_drawoff_vol_per_day:
+    :param initial_day:
+    :param temp_dT:
+    :param print_stats:
+    :param plot_demand:
+    :param start_plot:
+    :param end_plot:
+    :param save_fig:
+    :return:
+    """
 
     p_we = generate_daily_probability_step_function(
         mode='weekend',
@@ -379,7 +411,7 @@ def generate_dhw_profile_open_dhwcalc(s_step, weekend_weekday_factor=1.2,
     p_norm_integral = normalize_and_sum_list(lst=p_final)
 
     drawoffs, p_drawoffs = generate_drawoffs(
-        method='beta',
+        method=drawoff_method,
         mean_vol_per_drawoff=mean_vol_per_drawoff,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
         s_step=s_step,
@@ -512,7 +544,8 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
 
 
 def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
-                      mean_drawoff_vol_per_day=200, method='beta'):
+                      mean_drawoff_vol_per_day=200, method='beta',
+                      plot_drawoffs=True):
     """
     Generates two lists. First, the "drawoffs" list, with the darwoff events as
     flowrate entries in Liter/hour.  Second, the "p_drawoffs" list, which has
@@ -525,11 +558,10 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     day.
 
     Then, the drawoffs are generated following either a Gauss Distribution (
-    like describesd in the DHWcalc paper) or a beta distribution. The
+    as describesd in the DHWcalc paper) or a beta distribution. The
     advantage of the Beta Distribution is the ability to directly set values
-    for the minimum and the maximum value. If the a & b paremeter of the beta
-    distribtuion are both set to 5, the beta distribtuion looks very similar
-    to the Gauss distribtuion and can thus be used as a substitute.
+    for the minimum and the maximum value. More information on the Beta
+    Distribution can be found at https://en.wikipedia.org/wiki/Beta_distribution
 
     :param s_step:                      int     seconds within a timestep
     :param p_norm_integral:             list    min and max values taken
@@ -543,9 +575,14 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
 
+    sdt_dev_drawoff_flow_rate = 120
+
     mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
 
     total_drawoffs = int(mean_no_drawoffs_per_day * 365)
+
+    max_drawoff_flow_rate = 1200  # in L/h
+    min_drawoff_flow_rate = 6  # in L/h
 
     if method == 'beta':
         # https://en.wikipedia.org/wiki/Beta_distribution
@@ -554,18 +591,80 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
         # https://www.vosesoftware.com/riskwiki/NormalapproximationtotheBetadistribution.php
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.beta.html
 
-        max_drawoff_flow_rate = 1200
-        min_drawoff_flow_rate = 6
+        # scale the mean down to a value between 0 and 1 based on:
+        # https://en.wikipedia.org/wiki/Beta_distribution#Four_parameters
+        mu_dist = (av_drawoff_flow_rate - min_drawoff_flow_rate) / (
+                max_drawoff_flow_rate - min_drawoff_flow_rate)
 
-        a, b = 5, 5
+        # scale down the sdt_dev by the same factor
+        sig_dist = sdt_dev_drawoff_flow_rate * mu_dist / av_drawoff_flow_rate
+
+        # parameterize a and b shape parameters based on mean and std_dev:
+        # https://en.wikipedia.org/wiki/Beta_distribution#Mean_and_variance
+        v = (mu_dist * (1 - mu_dist) / sig_dist ** 2) - 1
+
+        a = mu_dist * v
+        b = (1 - mu_dist) * v
+
         dist = beta(a, b)
+
+        mean, var = beta.stats(a, b, moments='mv')
 
         drawoffs = min_drawoff_flow_rate + dist.rvs(size=total_drawoffs) * (
                 max_drawoff_flow_rate - min_drawoff_flow_rate)
 
-    elif method == 'gauss':
+        drawoffs_mean = statistics.mean(drawoffs)
+        drawoffs_stdev = statistics.stdev(drawoffs)
+        drawoffs_min = round(min(drawoffs), 2)
+        drawoffs_max = round(max(drawoffs), 2)
 
-        mu = av_drawoff_flow_rate       # mean
+        error_mean = abs(av_drawoff_flow_rate - drawoffs_mean) / max(
+            av_drawoff_flow_rate, drawoffs_mean)
+
+        error_stdev = abs(sdt_dev_drawoff_flow_rate - drawoffs_stdev) / max(
+                sdt_dev_drawoff_flow_rate, drawoffs_stdev)
+
+        error_max = (max_drawoff_flow_rate - drawoffs_max) / \
+                    max_drawoff_flow_rate
+        error_max = round(error_max, 3)
+
+        error_min = (drawoffs_min - min_drawoff_flow_rate) / \
+                    min_drawoff_flow_rate
+        error_min = round(error_min, 3)
+
+        if error_mean > 0.01:
+            raise Exception("The beta distribution changes the Mean Value of "
+                            "the drawoffs by more than 1%. Please Re-Run the "
+                            "script or change the accuracy requirements for "
+                            "the given sample size.")
+
+        if error_stdev > 0.02:
+            raise Exception("The beta distribution changes the Standard "
+                            "Deviation of the drawoffs by more than 2%. "
+                            "Please Re-Run the script or change the accuracy "
+                            "requirements for the given sample size.")
+
+        print("Max-Value Drawoffs = {} L/h, off by {} % from the Set "
+              "Max-Value =  {} L/h".format(drawoffs_max, error_max * 100,
+                                           max_drawoff_flow_rate))
+
+        print("Min-Value Drawoffs = {} L/h, off by {} % from the Set "
+              "Min-Value = {} L/h".format(drawoffs_min, error_min * 100,
+                                          min_drawoff_flow_rate))
+
+        if plot_drawoffs:
+            no_bins = int(total_drawoffs/50)
+            his, bins = np.histogram(drawoffs, bins=no_bins, density=True)
+            plt.plot(bins[:-1], his, ".")
+            plt.xlabel("Drawoff Rates in [L/h] for {} bins".format(no_bins))
+            plt.ylabel("Probability density")
+            plt.grid()
+            plt.show()
+
+    elif method == 'gauss':
+        # outdated, not reccomended to use
+
+        mu = av_drawoff_flow_rate  # mean
         sig = av_drawoff_flow_rate / 4  # standard deviation
         drawoffs = []  # in [L/h]
         mu_initial = 0
