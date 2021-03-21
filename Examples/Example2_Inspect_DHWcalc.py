@@ -14,13 +14,12 @@ end_plot = '2019-03-08'
 
 
 def main():
-
     # Load time-series from DHWcalc
-    water_dhwcalc_60_1 = OpenDHW.import_from_dhwcalc(s_step=60, categories=1)
+    water_dhwcalc_60_1 = OpenDHW.import_from_dhwcalc(s_step=60, categories=1,
+                                                     daily_demand=200)
 
     # Generate Histogram from the loaded timeseries
-    OpenDHW.draw_histplot_from_profile(dhw_profile_LperH=water_dhwcalc_60_1,
-                                       s_step=60)
+    OpenDHW.draw_histplot(dhw_profile_LperH=water_dhwcalc_60_1, s_step=60)
 
     # Generate Lineplot from the loaded timeseries
     OpenDHW.draw_lineplot(method='DHWcalc', s_step=s_step,

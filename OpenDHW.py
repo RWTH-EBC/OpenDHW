@@ -8,6 +8,7 @@ import xlrd
 import math
 import statistics
 import random
+import scipy
 from scipy.stats import beta
 import matplotlib.dates as mdates
 
@@ -134,6 +135,10 @@ def compare_generators(first_method, first_series_LperH, second_method,
         drawoffs_mean_no2 = round(statistics.mean(drawoffs_second_series), 2)
         drawoffs_stdev_no2 = round(statistics.stdev(drawoffs_second_series), 2)
 
+        # compute Jensen Shannon Distance
+        distance = jensen_shannon_distance(q=first_series_LperH,
+                                           p=second_series_LperH)
+
         fig, (ax1, ax2) = plt.subplots(2, 1)
         fig.tight_layout()
 
@@ -142,11 +147,14 @@ def compare_generators(first_method, first_series_LperH, second_method,
         ax1 = sns.histplot(ax=ax1, data=drawoffs_first_series, kde=True)
         ax2 = sns.histplot(ax=ax2, data=drawoffs_second_series, kde=True)
 
-        ax1.set_title('Water time-series from {}, timestep = {} s Yearly '
-                      'Demand = {} L, \n No. Drawoffs = {}, Mean = {} L/h, '
-                      'Standard Deviation = {} L/h'.format(
-            first_method, s_step, first_series_yearly_water_demand,
-            first_series_non_zeros, drawoffs_mean_no1, drawoffs_stdev_no1))
+        ax1.set_title('Jensen Shannon Distance = {} \n Water time-series from'
+                      '{}, timestep = {} s, Yearly Demand = {} L, \n No. '
+                      'Drawoffs = {}, Mean = {} L/h, Standard Deviation = {} '
+                      'L/h'.format(distance,
+                                   first_method, s_step,
+                                   first_series_yearly_water_demand,
+                                   first_series_non_zeros, drawoffs_mean_no1,
+                                   drawoffs_stdev_no1))
 
         ax1.set_ylabel('Count in a Year')
 
@@ -164,7 +172,7 @@ def compare_generators(first_method, first_series_LperH, second_method,
     return
 
 
-def import_from_dhwcalc(s_step, categories):
+def import_from_dhwcalc(s_step, categories, daily_demand):
     """
     DHWcalc yields Volume Flow TimeSeries (in Liters per hour).
 
@@ -174,21 +182,13 @@ def import_from_dhwcalc(s_step, categories):
     :return dhw_demand: list:   each timestep contains the Energyflow in [W]
     """
 
-    # timeseries are 200 L/d -> 73000 L/a (for 5 people, each person 40 L/d)
-    if s_step == 60 and categories == 1:
-        dhw_file = "DHWcalc_Files/DHWcalc_200L_1min_1cat_step_functions.txt"
-    elif s_step == 600 and categories == 1:
-        dhw_file = "DHWcalc_Files/DHWcalc_200L_10min_1cat_step_functions.txt"
-    elif s_step == 60 and categories == 4:
-        dhw_file = "DHWcalc_Files/200L_1min_4cat_step_functions" \
-                   "/200L_1min_4cat_step_functions.txt"
-    elif s_step == 600 and categories == 4:
-        dhw_file = "DHWcalc_Files/200L_10min_4cat_step_functions" \
-                   "/200L_10min_4cat_step_functions.txt"
-    else:
-        raise Exception("Unkown Time Step or #Categories for DHWcalc")
+    dhw_file = "{}L_{}min_{}cat_step_functions.txt".format(daily_demand,
+                                                           int(s_step / 60),
+                                                           categories)
 
-    dhw_profile = Path.cwd() / dhw_file
+    dhw_profile = Path.cwd().parent / "DHWcalc_Files" / dhw_file
+
+    assert dhw_profile.exists(), 'No DHWcalc File for the selected parameters.'
 
     # Flowrate in Liter per Hour in each Step
     water_LperH = [int(word.strip('\n')) for word in
@@ -197,7 +197,14 @@ def import_from_dhwcalc(s_step, categories):
     return water_LperH
 
 
-def draw_histplot_from_profile(dhw_profile_LperH, s_step):
+def draw_histplot(dhw_profile_LperH, s_step):
+    """
+    Takes a DHW profile and plots a histogram with some stats in the title
+
+    :param dhw_profile_LperH:   list:   the profile
+    :param s_step:              int:    seconds within a timestep
+    :return:
+    """
     water_LperSec = [x / 3600 for x in dhw_profile_LperH]
     yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
 
@@ -347,10 +354,8 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
 
 
 def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
-                                         initial_day=0, temp_dT=35,
-                                         print_stats=True, plot_demand=True,
-                                         start_plot='2019-01-01',
-                                         end_plot='2019-01-03', save_fig=False):
+                                         initial_day=0):
+
     p_we = generate_daily_probability_step_function(
         mode='weekend',
         s_step=s_step
@@ -390,20 +395,7 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
         s_step=s_step
     )
 
-    # Plot
-    dhw_demand = draw_lineplot(
-        method='Average_Profile_Method',
-        s_step=s_step,
-        water_LperH=water_LperH,
-        start_plot=start_plot,
-        end_plot=end_plot,
-        temp_dT=temp_dT,
-        print_stats=print_stats,
-        plot_demand=plot_demand,
-        save_fig=save_fig
-    )
-
-    return dhw_demand, water_LperH
+    return water_LperH
 
 
 def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
@@ -611,6 +603,9 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     """
     # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
 
+    # Todo: "A flow rate step size of 6 l/h is defined by the program."
+    # Todo: checken warum total drawoffs in DHWcalc anders ist
+
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
 
     sdt_dev_drawoff_flow_rate = 120  # in L/h
@@ -737,7 +732,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
         up_lim = mu + 2 * sig
 
         # cut gauss distribution
-        drawoffs = [i for i in drawoffs if i > low_lim and i < up_lim]
+        drawoffs = [i for i in drawoffs if low_lim < i < up_lim]
 
         curr_no_drawoffs = len(drawoffs)
         no_drawoffs_left = total_drawoffs - curr_no_drawoffs
@@ -747,9 +742,15 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
         drawoffs.extend(noise)
 
-        # ax = sns.displot(drawoffs, kde=True, palette=[rwth_blue, rwth_red])
-        # plt.show()
+        # DHWcalc has a set flow rate step rather than a continuous
+        # distribution. Thus, we round the drawoff distribution according to
+        # this step width.
+        flow_rate_step = 6  # L/h
+        drawoffs = [flow_rate_step * round(i / flow_rate_step) for i in
+                    drawoffs]
 
+        # sns.displot(drawoffs, kde=True)
+        # plt.show()
 
     else:
         raise Exception("Unkown method to generate drawoffs. choose Gauss or "
@@ -978,7 +979,6 @@ def draw_lineplot(method, s_step, series, series_type='water',
     fig.tight_layout()
 
     if series_type == 'water':
-
         water_LperH = series
         water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
 
@@ -1004,7 +1004,6 @@ def draw_lineplot(method, s_step, series, series_type='water',
             method, s_step, yearly_water_demand, max_water_flow))
 
     if series_type == 'heat':
-
         heat = series  # in Watt
 
         # make dataframe for plotting with seaborn
@@ -1122,3 +1121,28 @@ def plot_multiple_runs(dhw_demands_df, drawoffs_df, plot_demands_overlay=False,
         ax = sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5,
                          fill=False, linewidth=0.5, legend=False)
         plt.show()
+
+
+def jensen_shannon_distance(p, q):
+    """
+    method to compute the Jenson-Shannon Distance between two probability
+    distributions. 0 indicates that the two distributions are the same,
+    and 1 would indicate that they are nowhere similar.
+
+    From https://medium.com/@sourcedexter/how-to-find-the-similarity-between-two-probability-distributions-using-python-a7546e90a08d
+    """
+
+    # convert the vectors into numpy arrays in case that they aren't
+    p = np.array(p)
+    q = np.array(q)
+
+    # calculate m
+    m = (p + q) / 2
+
+    # compute Jensen Shannon Divergence
+    divergence = (scipy.stats.entropy(p, m) + scipy.stats.entropy(q, m)) / 2
+
+    # compute the Jensen Shannon Distance
+    distance = np.sqrt(divergence)
+
+    return round(distance, 4)
