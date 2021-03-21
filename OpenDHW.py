@@ -941,8 +941,9 @@ def compute_heat(s_step, water_LperH, temp_dT=35, print_stats=True):
     return dhw  # in kWh
 
 
-def draw_lineplot(method, s_step, water_LperH, start_plot='2019-02-01',
-                  end_plot='2019-02-05', save_fig=False):
+def draw_lineplot(method, s_step, series, series_type='water',
+                  start_plot='2019-02-01', end_plot='2019-02-05',
+                  save_fig=False):
     """
     Takes a timeseries of waterflows per timestep in [L/h]. Computes a
     DHW Demand series in [kWh]. Computes additional stats an optionally
@@ -951,8 +952,7 @@ def draw_lineplot(method, s_step, water_LperH, start_plot='2019-02-01',
     :param method:      str:    Name of the DHW Method, f.e. DHWcalc, PyCity.
                                 Just for naming the plot.
     :param s_step:      int:    seconds within a timestep. F.e. 60, 600, 3600
-    :param water_LperH: list:   list that holds the waterflow values for each
-                                timestep in Liters per Hour.
+    :param series:      list:   list that holds the timeseries.
     :param start_plot:  str:    start date of the plot. F.e. 2019-01-01
     :param end_plot:    str:    end date of the plot. F.e. 2019-02-01
     :param save_fig:    bool:   decide to save plots as pdf
@@ -961,14 +961,6 @@ def draw_lineplot(method, s_step, water_LperH, start_plot='2019-02-01',
                 dhw:    list:   list of the heat demand for DHW for each
                                 timestep in kWh.
     """
-
-    water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
-
-    # compute Sums and Maxima for Water and Heat
-    yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
-    av_daily_water = round(yearly_water_demand / 365, 1)
-    av_daily_water_lst = [av_daily_water for i in water_LperH]  # L/day
-    max_water_flow = round(max(water_LperH), 1)  # in L/h
 
     # RWTH colours
     rwth_blue = "#00549F"
@@ -982,23 +974,50 @@ def draw_lineplot(method, s_step, water_LperH, start_plot='2019-02-01',
                                freq=str(s_step) + 'S')
     date_range = date_range[:-1]
 
-    # make dataframe for plotting with seaborn
-    plot_df = pd.DataFrame({'Waterflow [L/h]': water_LperH,
-                            'Yearly av. Demand [{} L/day]'.format(
-                                av_daily_water): av_daily_water_lst},
-                           index=date_range)
-
     fig, ax1 = plt.subplots()
     fig.tight_layout()
 
-    ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
-                       linewidth=1.0, palette=[rwth_blue, rwth_red])
+    if series_type == 'water':
 
-    ax1.legend(loc="upper left")
+        water_LperH = series
+        water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
 
-    plt.title('Water Time-series from {}, timestep = {} s\n'
-              'Yearly Water Demand = {} L with a Peak of {} L/h'.format(
-        method, s_step, yearly_water_demand, max_water_flow))
+        # compute Sums and Maxima for Water and Heat
+        yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
+        av_daily_water = round(yearly_water_demand / 365, 1)
+        av_daily_water_lst = [av_daily_water for i in water_LperH]  # L/day
+        max_water_flow = round(max(water_LperH), 1)  # in L/h
+
+        # make dataframe for plotting with seaborn
+        plot_df = pd.DataFrame({'Waterflow [L/h]': water_LperH,
+                                'Yearly av. Demand [{} L/day]'.format(
+                                    av_daily_water): av_daily_water_lst},
+                               index=date_range)
+
+        ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
+                           linewidth=1.0, palette=[rwth_blue, rwth_red])
+
+        ax1.legend(loc="upper left")
+
+        plt.title('Water Time-series from {}, timestep = {} s\n'
+                  'Yearly Water Demand = {} L with a Peak of {} L/h'.format(
+            method, s_step, yearly_water_demand, max_water_flow))
+
+    if series_type == 'heat':
+
+        heat = series  # in Watt
+
+        # make dataframe for plotting with seaborn
+        plot_df = pd.DataFrame({'Heat [W]': heat},
+                               index=date_range)
+
+        ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
+                           linewidth=1.0, palette=[rwth_red])
+
+        ax1.legend(loc="upper left")
+
+        plt.title('Heat Time-series from {}, timestep = {} s\n'
+                  'with a Peak of {} L/h'.format(method, s_step, max(heat)))
 
     # set the x axis ticks
     # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
