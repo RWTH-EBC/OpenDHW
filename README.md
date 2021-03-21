@@ -1,5 +1,5 @@
 # OpenDHWcalc
-Small script to generate Domestic Hot Water Profiles for Households. Inspired by the DHWcalc programme from Uni Kassel.
+Small script to generate Domestic Hot Water Profiles for Households. Inspired by the DHWcalc programme from Uni Kassel ([Link Paper](http://www.solar.uni-kassel.de/sat_publikationen_pdf/2005%20ISES-SWC%20Jordan%20und%20Vajen%20Program%20to%20Generate%20Domestic%20Hot%20Water%20Profiles%20with%20Statistical%20Means%20for%20User%20Defined%20Conditions.pdf), [Link Manual](https://www.uni-kassel.de/maschinenbau/fileadmin/datas/fb15/ITE/icons/Bilder_re2/Bilder_OpenSorp/dhw-calc_1-10_manual.pdf)).
 
 Created for [RWTH Aachen University, E.ON Energy
 Research Center, Institute for Energy Efficient Buildings and Indoor
