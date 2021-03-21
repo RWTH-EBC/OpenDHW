@@ -82,12 +82,13 @@ def compare_generators(first_method, first_series_LperH, second_method,
                                           first_series_av_daily_water_lst},
                                      index=date_range)
 
-        second_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(second_method):
-                                           second_series_LperH,
-                                       'Yearly av. Demand [{} L/day]'.format(
-                                           second_series_av_daily_water):
-                                           second_series_av_daily_water_lst},
-                                      index=date_range)
+        second_plot_df = pd.DataFrame(
+            {'Waterflow {} [L/h]'.format(second_method):
+                 second_series_LperH,
+             'Yearly av. Demand [{} L/day]'.format(
+                 second_series_av_daily_water):
+                 second_series_av_daily_water_lst},
+            index=date_range)
 
         fig, (ax1, ax2) = plt.subplots(2, 1)
         fig.tight_layout()
@@ -95,20 +96,22 @@ def compare_generators(first_method, first_series_LperH, second_method,
         ax1 = sns.lineplot(ax=ax1, data=first_plot_df[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-        ax1.set_title('Water time-series from {}, timestep = {} s\n Yearly Demand ='
-                      '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
-            first_method, s_step, first_series_yearly_water_demand,
-            first_series_max_water_flow, first_series_non_zeros))
+        ax1.set_title(
+            'Water time-series from {}, timestep = {} s\n Yearly Demand ='
+            '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
+                first_method, s_step, first_series_yearly_water_demand,
+                first_series_max_water_flow, first_series_non_zeros))
 
         ax1.legend(loc="upper left")
 
         ax2 = sns.lineplot(ax=ax2, data=second_plot_df[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-        ax2.set_title('Water time-series from {}, timestep = {} s\n Yearly Water '
-                      '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
-            second_method, s_step, second_series_yearly_water_demand,
-            second_series_max_water_flow, second_series_non_zeros))
+        ax2.set_title(
+            'Water time-series from {}, timestep = {} s\n Yearly Water '
+            '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
+                second_method, s_step, second_series_yearly_water_demand,
+                second_series_max_water_flow, second_series_non_zeros))
 
         ax2.legend(loc="upper left")
 
@@ -120,7 +123,6 @@ def compare_generators(first_method, first_series_LperH, second_method,
             fig.savefig(dir_output / "Demand_Comparision.pdf")
 
     if plot_distribution:
-
         # get non-zero values of the proule
         drawoffs_first_series = [i for i in first_series_LperH if i > 0]
         drawoffs_second_series = [i for i in second_series_LperH if i > 0]
@@ -146,11 +148,16 @@ def compare_generators(first_method, first_series_LperH, second_method,
             first_method, s_step, first_series_yearly_water_demand,
             first_series_non_zeros, drawoffs_mean_no1, drawoffs_stdev_no1))
 
+        ax1.set_ylabel('Count in a Year')
+
         ax2.set_title('Water time-series from {}, timestep = {} s Yearly '
                       'Demand = {} L, \n No. Drawoffs = {}, Mean = {} L/h, '
                       'Standard Deviation = {} L/h'.format(
             second_method, s_step, second_series_yearly_water_demand,
             second_series_non_zeros, drawoffs_mean_no2, drawoffs_stdev_no2))
+
+        ax2.set_ylabel('Count in a Year')
+        ax2.set_xlabel('Flowrate [L/h]')
 
         plt.show()
 
@@ -190,10 +197,12 @@ def import_from_dhwcalc(s_step, categories):
     return water_LperH
 
 
-def analyze_dhw_profile(dhw_profile):
+def draw_histplot_from_profile(dhw_profile_LperH, s_step):
+    water_LperSec = [x / 3600 for x in dhw_profile_LperH]
+    yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
 
     # get non-zero values of the proule
-    drawoffs = [i for i in dhw_profile if i > 0]
+    drawoffs = [i for i in dhw_profile_LperH if i > 0]
 
     # compute some stats
     drawoffs_mean = round(statistics.mean(drawoffs), 2)
@@ -201,9 +210,15 @@ def analyze_dhw_profile(dhw_profile):
 
     # plot the distribution
     # https://seaborn.pydata.org/generated/seaborn.displot.html
-    ax = sns.displot(drawoffs, kde=True, palette=[rwth_blue, rwth_red])
-    ax.set(title="Mean = {} L/h, Standard Deviation = {} L/h".format(
-        drawoffs_mean, drawoffs_stdev))
+    ax = sns.histplot(drawoffs, kde=True, palette=[rwth_blue, rwth_red])
+
+    # ax2 = ax.twinx()
+    # sns.kdeplot(ax=ax2, data=drawoffs, alpha=.25, bw_adjust=0.05)
+
+    ax.set_title('Timestep = {} s, Yearly Demand = {} L, \n No. Drawoffs = {}, '
+                 'Mean = {} L/h, Standard Deviation = {} L/h'.format(
+        s_step, yearly_water_demand, len(drawoffs), drawoffs_mean,
+        drawoffs_stdev), fontdict={'fontsize': 10})
 
     plt.show()
 
@@ -376,7 +391,7 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
     )
 
     # Plot
-    dhw_demand = compute_heat_and_plot_demand(
+    dhw_demand = draw_lineplot(
         method='Average_Profile_Method',
         s_step=s_step,
         water_LperH=water_LperH,
@@ -392,8 +407,8 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
 
 
 def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
-                         drawoff_method='beta', mean_vol_per_drawoff=8,
-                         mean_drawoff_vol_per_day=200,
+                         drawoff_method='gauss_combined',
+                         mean_vol_per_drawoff=8, mean_drawoff_vol_per_day=200,
                          initial_day=0):
     """
     Generates a DHW profile. The generation is split up in different
@@ -568,7 +583,7 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
 
 
 def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
-                      mean_drawoff_vol_per_day=200, method='beta'):
+                      mean_drawoff_vol_per_day=200, method='gauss_combined'):
     """
     Generates two lists. First, the "drawoffs" list, with the darwoff events as
     flowrate entries in Liter/hour.  Second, the "p_drawoffs" list, which has
@@ -645,7 +660,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
             av_drawoff_flow_rate, drawoffs_mean)
 
         error_stdev = abs(sdt_dev_drawoff_flow_rate - drawoffs_stdev) / max(
-                sdt_dev_drawoff_flow_rate, drawoffs_stdev)
+            sdt_dev_drawoff_flow_rate, drawoffs_stdev)
 
         error_max = (max_drawoff_flow_rate - drawoffs_max) / \
                     max_drawoff_flow_rate
@@ -885,10 +900,49 @@ def plot_average_profiles_pycity(save_fig=False):
         fig.savefig(dir_output / "Average_Profiles_PyCity.pdf")
 
 
-def compute_heat_and_plot_demand(method, s_step, water_LperH,
-                                 plot_demand=False, start_plot='2019-02-01',
-                                 end_plot='2019-02-05', temp_dT=35,
-                                 print_stats=False, save_fig=False):
+def compute_heat(s_step, water_LperH, temp_dT=35, print_stats=True):
+    """
+    Takes a timeseries of waterflows per timestep in [L/h]. Computes a
+    DHW Demand series in [kWh]. Computes additional stats an optionally
+    prints them out. Optionally plots the timesieries with additional stats.
+
+    :param s_step:      int:    seconds within a timestep. F.e. 60, 600, 3600
+    :param water_LperH: list:   list that holds the waterflow values for each
+                                timestep in Liters per Hour.
+    :param temp_dT:     int:    temperature difference between freshwater and
+                                average DHW outlet temperature. F.e. 35
+
+    :return:    dhw:    list:   list of the heat demand for DHW for each
+                                timestep in kWh.
+    """
+
+    water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
+
+    rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
+    cp = 4180  # J/kgK
+    dhw = [i * rho * cp * temp_dT for i in water_LperSec]  # in W
+
+    if print_stats:
+        # compute Sums and Maxima for Water and Heat
+        yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
+        max_water_flow = round(max(water_LperH), 1)  # in L/h
+
+        yearly_dhw_demand = round(sum(dhw) * s_step / (3600 * 1000), 1)  # kWh
+        max_dhw_heat_flow = round(max(dhw) / 1000, 1)  # in kW
+
+        print("Yearly drinking water demand from DHWcalc Alias is {:.2f} L"
+              " with a maximum of {:.2f} L/h".format(yearly_water_demand,
+                                                     max_water_flow))
+
+        print("Yearly DHW energy demand from DHWcalc Alias is {:.2f} kWh"
+              " with a maximum of {:.2f} kW".format(yearly_dhw_demand,
+                                                    max_dhw_heat_flow))
+
+    return dhw  # in kWh
+
+
+def draw_lineplot(method, s_step, water_LperH, start_plot='2019-02-01',
+                  end_plot='2019-02-05', save_fig=False):
     """
     Takes a timeseries of waterflows per timestep in [L/h]. Computes a
     DHW Demand series in [kWh]. Computes additional stats an optionally
@@ -901,8 +955,6 @@ def compute_heat_and_plot_demand(method, s_step, water_LperH,
                                 timestep in Liters per Hour.
     :param start_plot:  str:    start date of the plot. F.e. 2019-01-01
     :param end_plot:    str:    end date of the plot. F.e. 2019-02-01
-    :param temp_dT:     int:    temperature difference between freshwater and
-                                average DHW outlet temperature. F.e. 35
     :param save_fig:    bool:   decide to save plots as pdf
 
     :return:    fig:    fig:    figure of the plot
@@ -912,83 +964,142 @@ def compute_heat_and_plot_demand(method, s_step, water_LperH,
 
     water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
 
-    rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
-    cp = 4180  # J/kgK
-    dhw = [i * rho * cp * temp_dT for i in water_LperSec]  # in W
-
     # compute Sums and Maxima for Water and Heat
     yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
     av_daily_water = round(yearly_water_demand / 365, 1)
     av_daily_water_lst = [av_daily_water for i in water_LperH]  # L/day
     max_water_flow = round(max(water_LperH), 1)  # in L/h
-    yearly_dhw_demand = round(sum(dhw) * s_step / (3600 * 1000), 1)  # kWh
-    max_dhw_heat_flow = round(max(dhw) / 1000, 1)  # in kW
 
-    if print_stats:
-        print("Yearly drinking water demand from DHWcalc Alias is {:.2f} L"
-              " with a maximum of {:.2f} L/h".format(yearly_water_demand,
-                                                     max_water_flow))
+    # RWTH colours
+    rwth_blue = "#00549F"
+    rwth_red = "#CC071E"
 
-        # print("Yearly DHW energy demand from DHWcalc Alias is {:.2f} kWh"
-        #       " with a maximum of {:.2f} kW".format(yearly_dhw_demand,
-        #                                             max_dhw_heat_flow))
+    # sns.set_style("white")
+    sns.set_context("paper")
 
-    if plot_demand:
-        # RWTH colours
-        rwth_blue = "#00549F"
-        rwth_red = "#CC071E"
+    # set date range to simplify plot slicing
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
 
-        # sns.set_style("white")
-        sns.set_context("paper")
+    # make dataframe for plotting with seaborn
+    plot_df = pd.DataFrame({'Waterflow [L/h]': water_LperH,
+                            'Yearly av. Demand [{} L/day]'.format(
+                                av_daily_water): av_daily_water_lst},
+                           index=date_range)
 
-        # set date range to simplify plot slicing
-        date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
-                                   freq=str(s_step) + 'S')
-        date_range = date_range[:-1]
+    fig, ax1 = plt.subplots()
+    fig.tight_layout()
 
-        # make dataframe for plotting with seaborn
-        plot_df = pd.DataFrame({'Waterflow [L/h]': water_LperH,
-                                'Yearly av. Demand [{} L/day]'.format(
-                                    av_daily_water): av_daily_water_lst},
-                               index=date_range)
+    ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
+                       linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-        # fig, (ax1, ax2) = plt.subplots(2, 1)
+    ax1.legend(loc="upper left")
+
+    plt.title('Water Time-series from {}, timestep = {} s\n'
+              'Yearly Water Demand = {} L with a Peak of {} L/h'.format(
+        method, s_step, yearly_water_demand, max_water_flow))
+
+    # set the x axis ticks
+    # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
+    locator = mdates.AutoDateLocator()
+    formatter = mdates.ConciseDateFormatter(locator)
+    formatter.formats = ['%y', '%b', '%d', '%H:%M', '%H:%M', '%S.%f', ]
+    formatter.zero_formats = [''] + formatter.formats[:-1]
+    formatter.zero_formats[3] = '%d-%b'
+    formatter.offset_formats = ['', '%Y', '%b %Y', '%d %b %Y', '%d %b %Y',
+                                '%d %b %Y %H:%M', ]
+    ax1.xaxis.set_major_locator(locator)
+    ax1.xaxis.set_major_formatter(formatter)
+
+    plt.show()
+
+    if save_fig:
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+        fig.savefig(dir_output / "Demand_{}_sliced.pdf".format(method))
+
+    return fig
+
+
+def generate_multiple_profiles(s_step, runs=5):
+    """
+    Calls the 'generate_dhw_profile' function multiple times and saves the
+    resulting Time-Series in a pandas dataframe. Also saves all drawoff events (
+    non-zero entries of the dhw_profiles) in another Dataframe. Both
+    Dataframes are then returned.
+
+    :param s_step:  int:    seconds within a timestep
+    :param runs:    int:    number of dhw profile that are generated
+    :return: dhw_demands_df, drawoffs_df
+    """
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
+
+    # make dataframes for plotting with seaborn
+    dhw_demands_df = pd.DataFrame(columns=range(runs), index=date_range)
+    drawoffs_df = pd.DataFrame(columns=range(runs))
+
+    for run in range(runs):
+        profile = generate_dhw_profile(s_step=s_step,
+                                       weekend_weekday_factor=1.2,
+                                       drawoff_method='gauss_combined',
+                                       mean_vol_per_drawoff=8,
+                                       mean_drawoff_vol_per_day=200,
+                                       initial_day=0)
+
+        dhw_demands_df[run] = profile
+
+        # drawoffs events are values in the profile larger than 0
+        drawoffs = [event for event in profile if event > 0]
+        drawoffs_df[run] = drawoffs
+
+    dhw_demands_df['Average'] = dhw_demands_df.mean(axis=1)  # average profile
+
+    return dhw_demands_df, drawoffs_df
+
+
+def plot_multiple_runs(dhw_demands_df, drawoffs_df, plot_demands_overlay=False,
+                       start_plot='2019-02-01', end_plot='2019-02-02',
+                       plot_hist=True, plot_kde=True):
+    """
+    Plots the dataframes generated by the 'generate_multiple_profiles'
+    function. The Dataframes hold multiple dhw demand profiles.
+
+    :param dhw_demands_df:
+    :param drawoffs_df:
+    :param plot_demands_overlay:
+    :param start_plot:
+    :param end_plot:
+    :param plot_hist:
+    :param plot_kde:
+    :return:
+    """
+
+    if plot_demands_overlay:
         fig, ax1 = plt.subplots()
         fig.tight_layout()
 
-        ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
-                           linewidth=1.0, palette=[rwth_blue, rwth_red])
+        ax1 = sns.lineplot(ax=ax1, data=dhw_demands_df[start_plot:end_plot],
+                           linewidth=0.5, legend=False)
 
-        # ax2 = sns.lineplot(ax=ax2, data=plot_df,
-        #                    linewidth=1.0, palette=[rwth_blue, rwth_red])
-
-        ax1.legend(loc="upper left")
-
-        plt.title('Water and Heat time-series from {}, dT = {} °C, '
-                  'timestep = {} s\n'
-                  'Yearly Water Demand = {} L with a Peak of {} L/h \n'
-                  'Yearly Heat Demand = {} kWh with a Peak of {} kW'.format(
-            method, temp_dT, s_step, yearly_water_demand, max_water_flow,
-            yearly_dhw_demand, max_dhw_heat_flow))
-
-        # set the x axis ticks
-        # https://matplotlib.org/3.1.1/gallery/
-        # ticks_and_spines/date_concise_formatter.html
+        # set beautiful x axis ticks for datetime
+        # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
         locator = mdates.AutoDateLocator()
         formatter = mdates.ConciseDateFormatter(locator)
-        formatter.formats = ['%y', '%b', '%d', '%H:%M', '%H:%M', '%S.%f', ]
-        formatter.zero_formats = [''] + formatter.formats[:-1]
-        formatter.zero_formats[3] = '%d-%b'
-        formatter.offset_formats = ['', '%Y', '%b %Y', '%d %b %Y', '%d %b %Y',
-                                    '%d %b %Y %H:%M', ]
         ax1.xaxis.set_major_locator(locator)
         ax1.xaxis.set_major_formatter(formatter)
 
         plt.show()
 
-        if save_fig:
-            dir_output = Path.cwd() / "plots"
-            dir_output.mkdir(exist_ok=True)
-            fig.savefig(dir_output / "Demand_{}_sliced.pdf".format(method))
+    if plot_hist:
+        ax = sns.histplot(data=drawoffs_df, kde=False, element="step",
+                          fill=False, stat='count', line_kws={'alpha': 0.8,
+                                                              'linewidth': 0.9})
+        plt.show()
 
-    return dhw  # in kWh
+    if plot_kde:
+        ax = sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5,
+                         fill=False, linewidth=0.5, legend=False)
+        plt.show()
