@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 import OpenDHW
 
-# ------- Parameter Section ---------
+"""
+This Example computes two TimeSeries with OpenDHW and load one Timeseries 
+from DHWcalc. Then each OpenDHW TimeSeries is compared with the DHWcalc 
+Timeseries.
+"""
+
+# --- Parameter Section ---
 s_step = 60
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
