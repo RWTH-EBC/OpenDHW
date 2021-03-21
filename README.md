@@ -8,18 +8,27 @@ Climate](https://www.ebc.eonerc.rwth-aachen.de/cms/~dmzz/E-ON-ERC-EBC/?lidx=1).
 
 ### Usage
 
-You can create a DHW profile simply by calling the "generate_dhw_profile_open_dhwcalc" function:
+To simplify the Usage of [OpenDHW](https://github.com/jonasgrs/OpenDHW/blob/main/OpenDHW.py), a few [Examples](https://github.com/jonasgrs/OpenDHW/tree/main/Examples) are given.
+
+You can create a DHW profile simply by calling the "generate_dhw_profile" function:
 
 ```Python
 import OpenDHW
 
-heat, water = OpenDHW.generate_dhw_profile_open_dhwcalc(s_step=s_step)
-
-heat2, water2 = OpenDHW.import_from_dhwcalc(s_step=s_step)
+water = OpenDHW.generate_dhw_profile(s_step=s_step)
 
 ```
 
-You can compare the OpenDHW Generator with DHWcalc files by calling the "compare_generators" function:
+You can also load a DHW profile from DHWcalc, as long as it is stored in [DHWcalc_Files](https://github.com/jonasgrs/OpenDHW/tree/main/DHWcalc_Files)
+
+```Python
+
+water = OpenDHW.import_from_dhwcalc(s_step=s_step, categories=1)
+
+```
+
+
+You can compare the OpenDHW Generator with the DHWcalc file by calling the "compare_generators" function:
 
 ```Python
 
