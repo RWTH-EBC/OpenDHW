@@ -603,7 +603,6 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     """
     # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
 
-    # Todo: "A flow rate step size of 6 l/h is defined by the program."
     # Todo: checken warum total drawoffs in DHWcalc anders ist
 
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
@@ -617,7 +616,39 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     max_drawoff_flow_rate = 1200  # in L/h
     min_drawoff_flow_rate = 6  # in L/h
 
-    if method == 'beta':
+    if method == 'gauss_combined':
+        # as close as it gets to the DHWcalc Algorithm
+
+        mu = av_drawoff_flow_rate  # in L/h
+        sig = sdt_dev_drawoff_flow_rate  # in L/h
+
+        drawoffs = [random.gauss(mu, sig) for i in range(total_drawoffs)]
+
+        low_lim = mu - 2 * sig
+        up_lim = mu + 2 * sig
+
+        # cut gauss distribution
+        drawoffs = [i for i in drawoffs if low_lim < i < up_lim]
+
+        curr_no_drawoffs = len(drawoffs)
+        no_drawoffs_left = total_drawoffs - curr_no_drawoffs
+
+        noise = [random.randint(low_lim, max_drawoff_flow_rate) for i in
+                 range(no_drawoffs_left)]
+
+        drawoffs.extend(noise)
+
+        # DHWcalc has a set flow rate step rather than a continuous
+        # distribution. Thus, we round the drawoff distribution according to
+        # this step width.
+        flow_rate_step = 6  # L/h
+        drawoffs = [flow_rate_step * round(i / flow_rate_step) for i in
+                    drawoffs]
+
+        # sns.displot(drawoffs, kde=True)
+        # plt.show()
+
+    elif method == 'beta':
         # https://en.wikipedia.org/wiki/Beta_distribution
         # https://stats.stackexchange.com/questions/317729/is-the-gaussian-distribution-a-specific-case-of-the-beta-distribution
         # https://stackoverflow.com/a/62364837
@@ -719,38 +750,6 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
                                 "list to zeros changes the Mean Value by more "
                                 "than 1%. Please choose a different standard "
                                 "deviation.")
-
-    elif method == 'gauss_combined':
-        # as close as it gets to the DHWcalc Algorithm
-
-        mu = av_drawoff_flow_rate  # in L/h
-        sig = sdt_dev_drawoff_flow_rate  # in L/h
-
-        drawoffs = [random.gauss(mu, sig) for i in range(total_drawoffs)]
-
-        low_lim = mu - 2 * sig
-        up_lim = mu + 2 * sig
-
-        # cut gauss distribution
-        drawoffs = [i for i in drawoffs if low_lim < i < up_lim]
-
-        curr_no_drawoffs = len(drawoffs)
-        no_drawoffs_left = total_drawoffs - curr_no_drawoffs
-
-        noise = [random.randint(low_lim, max_drawoff_flow_rate) for i in
-                 range(no_drawoffs_left)]
-
-        drawoffs.extend(noise)
-
-        # DHWcalc has a set flow rate step rather than a continuous
-        # distribution. Thus, we round the drawoff distribution according to
-        # this step width.
-        flow_rate_step = 6  # L/h
-        drawoffs = [flow_rate_step * round(i / flow_rate_step) for i in
-                    drawoffs]
-
-        # sns.displot(drawoffs, kde=True)
-        # plt.show()
 
     else:
         raise Exception("Unkown method to generate drawoffs. choose Gauss or "
