@@ -15,104 +15,69 @@ import matplotlib.dates as mdates
 # RWTH colours
 rwth_blue = "#00549F"
 rwth_red = "#CC071E"
+# sns.set_style("white")
+sns.set_context("paper")
 
 
-def compare_generators(first_method, first_series_LperH, second_method,
-                       second_series_LperH, s_step, start_plot='2019-03-01',
-                       end_plot='2019-03-08', plot_date_slice=True,
-                       plot_distribution=True, save_fig=False):
+def compare_generators(timeseries_df_1, timeseries_df_2,
+                       start_plot='2019-03-01', end_plot='2019-03-08',
+                       plot_date_slice=True, plot_distribution=True,
+                       save_fig=False):
     """
     Compares two methods of computing the water flow time series by means of
     a subplot.
-    :param first_method:        string: name of first method (f.e. DHWcalc)
-    :param first_series_LperH:  list:   first water flow time series
-    :param second_method:       string: name of second method (f.e. OpenDHW)
-    :param second_series_LperH: list:   second water flow time series
-    :param s_step:              int:    seconds within a timestep
+    :param timeseries_df_1:     list:   first water flow time series
+    :param timeseries_df_2:     list:   second water flow time series
     :param start_plot:          string: date, f.e. 2019-03-01
     :param end_plot:            string: date, f.e. 2019-03-08
+    :param plot_date_slice
+    :param plot_distribution
     :param save_fig:            bool:   decide to save the plot
     :return:
     """
 
     # compute Stats for first series
-    first_series_LperSec = [x / 3600 for x in first_series_LperH]
-
-    first_series_non_zeros = len([x for x in first_series_LperH if x != 0])
-
-    first_series_yearly_water_demand = round(sum(first_series_LperSec) *
-                                             s_step, 1)  # in L
-    first_series_av_daily_water = round(first_series_yearly_water_demand /
-                                        365, 1)
-    first_series_av_daily_water_lst = [first_series_av_daily_water for i in
-                                       first_series_LperH]  # L/day
-    first_series_max_water_flow = round(max(first_series_LperH), 1)  # in L/h
+    drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0]
+    yearly_water_demand_1 = timeseries_df_1['Water_L'].sum()
+    max_water_flow_1 = timeseries_df_1['Water_LperH'].max()
+    s_step_1 = timeseries_df_1.index.freqstr
+    method_1 = timeseries_df_1['Method'][0]
 
     # compute Stats for second series
-    second_series_LperSec = [x / 3600 for x in second_series_LperH]
-
-    second_series_non_zeros = len([x for x in second_series_LperH if x != 0])
-
-    second_series_yearly_water_demand = round(sum(second_series_LperSec) *
-                                              s_step, 1)  # in L
-    second_series_av_daily_water = round(second_series_yearly_water_demand /
-                                         365, 1)
-    second_series_av_daily_water_lst = [second_series_av_daily_water for i in
-                                        second_series_LperH]  # L/day
-    second_series_max_water_flow = round(max(second_series_LperH), 1)  # in L/h
-
-    # RWTH colours
-    rwth_blue = "#00549F"
-    rwth_red = "#CC071E"
-
-    # sns.set_style("white")
-    sns.set_context("paper")
+    drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0]
+    yearly_water_demand_2 = timeseries_df_2['Water_L'].sum()
+    max_water_flow_2 = timeseries_df_2['Water_LperH'].max()
+    s_step_2 = timeseries_df_2.index.freqstr
+    method_2 = timeseries_df_2['Method'][0]
 
     if plot_date_slice:
 
-        # set date range to simplify plot slicing
-        date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
-                                   freq=str(s_step) + 'S')
-        date_range = date_range[:-1]
-
         # make dataframe for plotting with seaborn
-        first_plot_df = pd.DataFrame({'Waterflow {} [L/h]'.format(first_method):
-                                          first_series_LperH,
-                                      'Yearly av. Demand [{} L/day]'.format(
-                                          first_series_av_daily_water):
-                                          first_series_av_daily_water_lst},
-                                     index=date_range)
-
-        second_plot_df = pd.DataFrame(
-            {'Waterflow {} [L/h]'.format(second_method):
-                 second_series_LperH,
-             'Yearly av. Demand [{} L/day]'.format(
-                 second_series_av_daily_water):
-                 second_series_av_daily_water_lst},
-            index=date_range)
+        plot_df_1 = timeseries_df_1[['Water_LperH', 'Mean_drawoff_vol_per_day']]
+        plot_df_2 = timeseries_df_2[['Water_LperH', 'Mean_drawoff_vol_per_day']]
 
         fig, (ax1, ax2) = plt.subplots(2, 1)
         fig.tight_layout()
 
-        ax1 = sns.lineplot(ax=ax1, data=first_plot_df[start_plot:end_plot],
+        ax1 = sns.lineplot(ax=ax1, data=plot_df_1[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
         ax1.set_title(
-            'Water time-series from {}, timestep = {} s\n Yearly Demand ='
-            '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
-                first_method, s_step, first_series_yearly_water_demand,
-                first_series_max_water_flow, first_series_non_zeros))
+            'Water time-series from {}, timestep = {}\n Yearly Demand ='
+            '{:.2f} L, Peak = {:.2f} L/h, No. Drawoffs = {}'.format(
+                method_1, s_step_1, yearly_water_demand_1,
+                max_water_flow_1, len(drawoffs_1)))
 
         ax1.legend(loc="upper left")
 
-        ax2 = sns.lineplot(ax=ax2, data=second_plot_df[start_plot:end_plot],
+        ax2 = sns.lineplot(ax=ax2, data=plot_df_2[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
         ax2.set_title(
-            'Water time-series from {}, timestep = {} s\n Yearly Water '
-            '{} L, Peak = {} L/h, No. Drawoffs = {}'.format(
-                second_method, s_step, second_series_yearly_water_demand,
-                second_series_max_water_flow, second_series_non_zeros))
+            'Water time-series from {}, timestep = {}\n Yearly Water '
+            '{:.2f} L, Peak = {:.2f} L/h, No. Drawoffs = {}'.format(
+                method_2, s_step_2, yearly_water_demand_2,
+                max_water_flow_2, len(drawoffs_2)))
 
         ax2.legend(loc="upper left")
 
@@ -124,45 +89,33 @@ def compare_generators(first_method, first_series_LperH, second_method,
             fig.savefig(dir_output / "Demand_Comparision.pdf")
 
     if plot_distribution:
-        # get non-zero values of the proule
-        drawoffs_first_series = [i for i in first_series_LperH if i > 0]
-        drawoffs_second_series = [i for i in second_series_LperH if i > 0]
-
-        # compute some stats
-        drawoffs_mean_no1 = round(statistics.mean(drawoffs_first_series), 2)
-        drawoffs_stdev_no1 = round(statistics.stdev(drawoffs_first_series), 2)
-
-        drawoffs_mean_no2 = round(statistics.mean(drawoffs_second_series), 2)
-        drawoffs_stdev_no2 = round(statistics.stdev(drawoffs_second_series), 2)
-
         # compute Jensen Shannon Distance
-        distance = jensen_shannon_distance(q=first_series_LperH,
-                                           p=second_series_LperH)
+        distance = jensen_shannon_distance(q=timeseries_df_1['Water_LperH'],
+                                           p=timeseries_df_2['Water_LperH'])
 
         fig, (ax1, ax2) = plt.subplots(2, 1)
         fig.tight_layout()
 
         # plot the distribution
         # https://seaborn.pydata.org/generated/seaborn.displot.html
-        ax1 = sns.histplot(ax=ax1, data=drawoffs_first_series, kde=True)
-        ax2 = sns.histplot(ax=ax2, data=drawoffs_second_series, kde=True)
+        ax1 = sns.histplot(ax=ax1, data=drawoffs_1['Water_LperH'], kde=True)
+        ax2 = sns.histplot(ax=ax2, data=drawoffs_2['Water_LperH'], kde=True)
 
-        ax1.set_title('Jensen Shannon Distance = {} \n Water time-series from'
-                      '{}, timestep = {} s, Yearly Demand = {} L, \n No. '
-                      'Drawoffs = {}, Mean = {} L/h, Standard Deviation = {} '
-                      'L/h'.format(distance,
-                                   first_method, s_step,
-                                   first_series_yearly_water_demand,
-                                   first_series_non_zeros, drawoffs_mean_no1,
-                                   drawoffs_stdev_no1))
+        ax1.set_title('Jensen Shannon Distance = {:.4f} \n Water time-series '
+                      'from {}, timestep = {}, Yearly Demand = {:.2f} L, '
+                      '\n No. Drawoffs = {}, Mean = {:.2f} L/h, Standard '
+                      'Deviation = {:.2f} L/h'.format(
+            distance, method_1, s_step_1, yearly_water_demand_1,
+            len(drawoffs_1), drawoffs_1['Water_LperH'].mean(), drawoffs_1[
+                'Water_LperH'].std()))
 
         ax1.set_ylabel('Count in a Year')
 
-        ax2.set_title('Water time-series from {}, timestep = {} s Yearly '
-                      'Demand = {} L, \n No. Drawoffs = {}, Mean = {} L/h, '
-                      'Standard Deviation = {} L/h'.format(
-            second_method, s_step, second_series_yearly_water_demand,
-            second_series_non_zeros, drawoffs_mean_no2, drawoffs_stdev_no2))
+        ax2.set_title('Water time-series from {}, timestep = {}, Yearly '
+                      'Demand = {:.2f} L, \n No. Drawoffs = {}, Mean = {:.2f}'
+                      'L/h, Standard Deviation = {:.2f} L/h'.format(
+            method_2, s_step_2, yearly_water_demand_2, len(drawoffs_2),
+            drawoffs_2['Water_LperH'].mean(), drawoffs_2['Water_LperH'].std()))
 
         ax2.set_ylabel('Count in a Year')
         ax2.set_xlabel('Flowrate [L/h]')
@@ -172,19 +125,19 @@ def compare_generators(first_method, first_series_LperH, second_method,
     return
 
 
-def import_from_dhwcalc(s_step, categories, daily_demand):
+def import_from_dhwcalc(s_step, categories, mean_drawoff_vol_per_day=200):
     """
     DHWcalc yields Volume Flow TimeSeries (in Liters per hour).
 
-    :param  s_step:     int:    resolution of output file in seconds
-    :param  categories  int:    either '1' or '4', see DHWcalc settings
+    :param  s_step:         int:    resolution of output file in seconds
+    :param  categories:     int:    either '1' or '4', see DHWcalc settings
+    :param  mean_drawoff_vol_per_day:   int:    daily water demand in Liters
 
     :return dhw_demand: list:   each timestep contains the Energyflow in [W]
     """
 
-    dhw_file = "{}L_{}min_{}cat_step_functions.txt".format(daily_demand,
-                                                           int(s_step / 60),
-                                                           categories)
+    dhw_file = "{}L_{}min_{}cat_step_functions.txt".format(
+        mean_drawoff_vol_per_day, int(s_step / 60), categories)
 
     dhw_profile = Path.cwd().parent / "DHWcalc_Files" / dhw_file
 
@@ -194,26 +147,39 @@ def import_from_dhwcalc(s_step, categories, daily_demand):
     water_LperH = [int(word.strip('\n')) for word in
                    open(dhw_profile).readlines()]  # L/h each step
 
-    return water_LperH
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
+
+    # make dataframe
+    timeseries_df = pd.DataFrame(water_LperH, index=date_range, columns=[
+        'Water_LperH'])
+
+    timeseries_df['Water_LperSec'] = timeseries_df['Water_LperH'] / 3600
+    timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
+    timeseries_df['method'] = 'DHWcalc'
+    timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
+    timeseries_df['categories'] = categories
+    timeseries_df['initial_day'] = 0
+    timeseries_df['weekend_weekday_factor'] = 1.2
+    timeseries_df['mean_vol_per_drawoff'] = 8
+
+    return timeseries_df
 
 
-def draw_histplot(dhw_profile_LperH, s_step):
+def draw_histplot(profile_df):
     """
     Takes a DHW profile and plots a histogram with some stats in the title
 
-    :param dhw_profile_LperH:   list:   the profile
-    :param s_step:              int:    seconds within a timestep
+    :param profile_df:   Dataframe that holds the water timeseries
     :return:
     """
-    water_LperSec = [x / 3600 for x in dhw_profile_LperH]
-    yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
 
-    # get non-zero values of the proule
-    drawoffs = [i for i in dhw_profile_LperH if i > 0]
+    yearly_water_demand = profile_df['Water_L'].sum()  # in L
 
-    # compute some stats
-    drawoffs_mean = round(statistics.mean(drawoffs), 2)
-    drawoffs_stdev = round(statistics.stdev(drawoffs), 2)
+    # get non-zero values of the profile
+    drawoffs = profile_df[profile_df['Water_LperH'] > 0]
+
 
     # plot the distribution
     # https://seaborn.pydata.org/generated/seaborn.displot.html
@@ -222,7 +188,12 @@ def draw_histplot(dhw_profile_LperH, s_step):
     # ax2 = ax.twinx()
     # sns.kdeplot(ax=ax2, data=drawoffs, alpha=.25, bw_adjust=0.05)
 
-    ax.set_title('Timestep = {} s, Yearly Demand = {} L, \n No. Drawoffs = {}, '
+    # compute some stats
+    drawoffs_mean = drawoffs['Water_LperH'].mean()  # Mean
+    drawoffs_stdev = drawoffs['Water_LperH'].std()  # Standard Deviation
+    s_step = profile_df.index.freqstr
+
+    ax.set_title('Timestep = {}, Yearly Demand = {} L, \n No. Drawoffs = {}, '
                  'Mean = {} L/h, Standard Deviation = {} L/h'.format(
         s_step, yearly_water_demand, len(drawoffs), drawoffs_mean,
         drawoffs_stdev), fontdict={'fontsize': 10})
@@ -462,14 +433,21 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
         p_norm_integral=p_norm_integral
     )
 
-    water_LperH = distribute_drawoffs(
+    timeseries_df = distribute_drawoffs(
         drawoffs=drawoffs,
         p_drawoffs=p_drawoffs,
         p_norm_integral=p_norm_integral,
         s_step=s_step
     )
 
-    return water_LperH
+    timeseries_df['method'] = 'OpenDHW'
+    timeseries_df['drawoff_method'] = drawoff_method
+    timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
+    timeseries_df['initial_day'] = initial_day
+    timeseries_df['weekend_weekday_factor'] = weekend_weekday_factor
+    timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
+
+    return timeseries_df
 
 
 def distribute_average_profile(average_profile, s_step, p_final):
@@ -571,7 +549,18 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
             if drawoff_count >= len(drawoffs):
                 break
 
-    return water_LperH
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
+
+    # make dataframe
+    timeseries_df = pd.DataFrame(water_LperH, index=date_range, columns=[
+        'Water_LperH'])
+
+    timeseries_df['Water_LperSec'] = timeseries_df['Water_LperH'] / 3600
+    timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
+
+    return timeseries_df
 
 
 def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
@@ -900,59 +889,37 @@ def plot_average_profiles_pycity(save_fig=False):
         fig.savefig(dir_output / "Average_Profiles_PyCity.pdf")
 
 
-def compute_heat(s_step, water_LperH, temp_dT=35, print_stats=True):
+def compute_heat(timeseries_df, temp_dT=35):
     """
     Takes a timeseries of waterflows per timestep in [L/h]. Computes a
-    DHW Demand series in [kWh]. Computes additional stats an optionally
-    prints them out. Optionally plots the timesieries with additional stats.
+    DHW Demand series in [kWh].
 
-    :param s_step:      int:    seconds within a timestep. F.e. 60, 600, 3600
-    :param water_LperH: list:   list that holds the waterflow values for each
-                                timestep in Liters per Hour.
+    :param timeseries_df:       Pandas Dataframe with all the timeseries
     :param temp_dT:     int:    temperature difference between freshwater and
-                                average DHW outlet temperature. F.e. 35
+                                average DHW outlet temperature. F.e. 35°C
 
-    :return:    dhw:    list:   list of the heat demand for DHW for each
-                                timestep in kWh.
+    :return: timeseries_df:     Dataframe with added 'Heat' Column
     """
-
-    water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
 
     rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
     cp = 4180  # J/kgK
-    dhw = [i * rho * cp * temp_dT for i in water_LperSec]  # in W
 
-    if print_stats:
-        # compute Sums and Maxima for Water and Heat
-        yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
-        max_water_flow = round(max(water_LperH), 1)  # in L/h
+    timeseries_df['Heat_W'] = timeseries_df[
+                                  'Water_LperSec'] * rho * cp * temp_dT
 
-        yearly_dhw_demand = round(sum(dhw) * s_step / (3600 * 1000), 1)  # kWh
-        max_dhw_heat_flow = round(max(dhw) / 1000, 1)  # in kW
-
-        print("Yearly drinking water demand from DHWcalc Alias is {:.2f} L"
-              " with a maximum of {:.2f} L/h".format(yearly_water_demand,
-                                                     max_water_flow))
-
-        print("Yearly DHW energy demand from DHWcalc Alias is {:.2f} kWh"
-              " with a maximum of {:.2f} kW".format(yearly_dhw_demand,
-                                                    max_dhw_heat_flow))
-
-    return dhw  # in kWh
+    return timeseries_df  # in kWh
 
 
-def draw_lineplot(method, s_step, series, series_type='water',
-                  start_plot='2019-02-01', end_plot='2019-02-05',
-                  save_fig=False):
+def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
+                  end_plot='2019-02-05', save_fig=False):
     """
     Takes a timeseries of waterflows per timestep in [L/h]. Computes a
     DHW Demand series in [kWh]. Computes additional stats an optionally
     prints them out. Optionally plots the timesieries with additional stats.
 
-    :param method:      str:    Name of the DHW Method, f.e. DHWcalc, PyCity.
-                                Just for naming the plot.
-    :param s_step:      int:    seconds within a timestep. F.e. 60, 600, 3600
-    :param series:      list:   list that holds the timeseries.
+
+    :param timeseries_df:       Pandas Dataframe that holds the timeseries.
+    :param plot_var:    str:    choose to plot Water or Heat
     :param start_plot:  str:    start date of the plot. F.e. 2019-01-01
     :param end_plot:    str:    end date of the plot. F.e. 2019-02-01
     :param save_fig:    bool:   decide to save plots as pdf
@@ -969,53 +936,40 @@ def draw_lineplot(method, s_step, series, series_type='water',
     # sns.set_style("white")
     sns.set_context("paper")
 
-    # set date range to simplify plot slicing
-    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
-                               freq=str(s_step) + 'S')
-    date_range = date_range[:-1]
-
     fig, ax1 = plt.subplots()
     fig.tight_layout()
 
-    if series_type == 'water':
-        water_LperH = series
-        water_LperSec = [x / 3600 for x in water_LperH]  # L/s each step
+    # compute some stats for figure title
+    yearly_water_demand = round(timeseries_df['Water_L'].sum(), 1)  # in L
+    max_water_flow = round(timeseries_df['Water_LperH'].max(), 1)  # in L/h
+    s_step = timeseries_df.index.freqstr
+    method = timeseries_df['Method'][0]
 
-        # compute Sums and Maxima for Water and Heat
-        yearly_water_demand = round(sum(water_LperSec) * s_step, 1)  # in L
-        av_daily_water = round(yearly_water_demand / 365, 1)
-        av_daily_water_lst = [av_daily_water for i in water_LperH]  # L/day
-        max_water_flow = round(max(water_LperH), 1)  # in L/h
-
+    if plot_var == 'water':
         # make dataframe for plotting with seaborn
-        plot_df = pd.DataFrame({'Waterflow [L/h]': water_LperH,
-                                'Yearly av. Demand [{} L/day]'.format(
-                                    av_daily_water): av_daily_water_lst},
-                               index=date_range)
+        plot_df = timeseries_df[['Water_LperH', 'Daily_Demand']]
 
         ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
         ax1.legend(loc="upper left")
 
-        plt.title('Water Time-series from {}, timestep = {} s\n'
+        plt.title('Water Time-series from {}, timestep = {}\n'
                   'Yearly Water Demand = {} L with a Peak of {} L/h'.format(
             method, s_step, yearly_water_demand, max_water_flow))
 
-    if series_type == 'heat':
-        heat = series  # in Watt
-
+    if plot_var == 'heat':
         # make dataframe for plotting with seaborn
-        plot_df = pd.DataFrame({'Heat [W]': heat},
-                               index=date_range)
+        plot_df = timeseries_df[['Heat_W']]
 
         ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_red])
 
         ax1.legend(loc="upper left")
 
-        plt.title('Heat Time-series from {}, timestep = {} s\n'
-                  'with a Peak of {} L/h'.format(method, s_step, max(heat)))
+        plt.title('Heat Time-series from {}, timestep = {}\n'
+                  'with a Peak of {} L/h'.format(method, s_step,
+                                                 max_water_flow))
 
     # set the x axis ticks
     # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
@@ -1039,66 +993,92 @@ def draw_lineplot(method, s_step, series, series_type='water',
     return fig
 
 
-def generate_multiple_profiles(s_step, runs=5):
-    """
-    Calls the 'generate_dhw_profile' function multiple times and saves the
-    resulting Time-Series in a pandas dataframe. Also saves all drawoff events (
-    non-zero entries of the dhw_profiles) in another Dataframe. Both
-    Dataframes are then returned.
+def add_additional_runs(timeseries_df, total_runs=5):
 
-    :param s_step:  int:    seconds within a timestep
-    :param runs:    int:    number of dhw profile that are generated
-    :return: dhw_demands_df, drawoffs_df
-    """
-    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
-                               freq=str(s_step) + 'S')
-    date_range = date_range[:-1]
+    total_runs -= 1
 
-    # make dataframes for plotting with seaborn
-    dhw_demands_df = pd.DataFrame(columns=range(runs), index=date_range)
-    drawoffs_df = pd.DataFrame(columns=range(runs))
+    s_step = int(timeseries_df.index.freqstr[:-1])
 
-    for run in range(runs):
-        profile = generate_dhw_profile(s_step=s_step,
-                                       weekend_weekday_factor=1.2,
-                                       drawoff_method='gauss_combined',
-                                       mean_vol_per_drawoff=8,
-                                       mean_drawoff_vol_per_day=200,
-                                       initial_day=0)
+    drawoffs = timeseries_df[timeseries_df['Water_LperH'] > 0]
 
-        dhw_demands_df[run] = profile
+    mean_vol_per_drawoff = timeseries_df['mean_vol_per_drawoff'][0]
+    mean_drawoff_vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
+    weekend_weekday_factor = timeseries_df['weekend_weekday_factor'][0]
+    initial_day = timeseries_df['initial_day'][0]
+    method = timeseries_df['method'][0]
 
-        # drawoffs events are values in the profile larger than 0
-        drawoffs = [event for event in profile if event > 0]
-        drawoffs_df[run] = drawoffs
+    if method == 'OpenDHW':
 
-    dhw_demands_df['Average'] = dhw_demands_df.mean(axis=1)  # average profile
+        drawoff_method = timeseries_df['drawoff_method'][0]
 
-    return dhw_demands_df, drawoffs_df
+        for run in range(total_runs):
+            extra_timeseries_df = generate_dhw_profile(
+                s_step=s_step,
+                weekend_weekday_factor=weekend_weekday_factor,
+                drawoff_method=drawoff_method,
+                mean_vol_per_drawoff=mean_vol_per_drawoff,
+                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+                initial_day=initial_day
+            )
+
+            additional_profile = extra_timeseries_df['Water_LperH']
+            additional_drawoffs = extra_timeseries_df[extra_timeseries_df[
+                                                          'Water_LperH'] > 0]
+
+            timeseries_df['Water_LperH_' + str(run)] = additional_profile
+
+    elif method == 'DHWcalc':
+
+        # adding multiple plots for DWHcalc is not so useful, as DHWcalc does
+        # not work with a random seed!
+        raise Exception('adding multiple plots for DWHcalc is not so useful, '
+                        'as DHWcalc does not work with a random seed!')
+
+        categories = timeseries_df['categories'][0]
+
+        for run in range(total_runs):
+            extra_timeseries_df = import_from_dhwcalc(
+                s_step=s_step,
+                categories=categories,
+                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
+            )
+
+            additional_profile = extra_timeseries_df['Water_LperH']
+            additional_drawoffs = extra_timeseries_df[extra_timeseries_df[
+                                                          'Water_LperH'] > 0]
+
+            timeseries_df['Water_LperH_' + str(run)] = additional_profile
+
+    # dhw_demands_df['Average'] = dhw_demands_df.mean(axis=1)  # average profile
+
+    return timeseries_df
 
 
-def plot_multiple_runs(dhw_demands_df, drawoffs_df, plot_demands_overlay=False,
+def plot_multiple_runs(timeseries_df, plot_demands_overlay=False,
                        start_plot='2019-02-01', end_plot='2019-02-02',
                        plot_hist=True, plot_kde=True):
-    """
-    Plots the dataframes generated by the 'generate_multiple_profiles'
-    function. The Dataframes hold multiple dhw demand profiles.
 
-    :param dhw_demands_df:
-    :param drawoffs_df:
-    :param plot_demands_overlay:
-    :param start_plot:
-    :param end_plot:
-    :param plot_hist:
-    :param plot_kde:
-    :return:
-    """
+    # only get specific columns
+    col_names = list(timeseries_df.columns)
+    cols_LperH = [name for name in col_names if 'Water_LperH' in name]
+    water_LperH_df = timeseries_df[cols_LperH]
+
+    # generate drawoff Dataframe. From each column, get only values > 0.
+    # Index Colum is not the DatetimeIndex anymore, as values in a single row
+    # do not corresond to a single Date!
+    drawoffs_df = pd.DataFrame(columns=cols_LperH)
+
+    for col_name in cols_LperH:
+
+        drawoffs_series = water_LperH_df[water_LperH_df[col_name] > 0][col_name]
+        drawoffs_list = list(drawoffs_series)
+        drawoffs_df[col_name] = drawoffs_list
 
     if plot_demands_overlay:
         fig, ax1 = plt.subplots()
         fig.tight_layout()
 
-        ax1 = sns.lineplot(ax=ax1, data=dhw_demands_df[start_plot:end_plot],
+        ax1 = sns.lineplot(ax=ax1, data=water_LperH_df[start_plot:end_plot],
                            linewidth=0.5, legend=False)
 
         # set beautiful x axis ticks for datetime

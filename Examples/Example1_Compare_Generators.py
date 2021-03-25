@@ -16,7 +16,7 @@ end_plot = '2019-03-08'
 def main():
 
     # generate time-series with OpenDHW
-    water_open_dhw_60 = OpenDHW.generate_dhw_profile(
+    timeseries_df_gauss = OpenDHW.generate_dhw_profile(
         s_step=s_step,
         weekend_weekday_factor=1.2,
         mean_vol_per_drawoff=8,
@@ -25,7 +25,7 @@ def main():
         initial_day=0,
     )
 
-    water_open_dhw_60_beta = OpenDHW.generate_dhw_profile(
+    timeseries_df_beta = OpenDHW.generate_dhw_profile(
         s_step=s_step,
         weekend_weekday_factor=1.2,
         mean_vol_per_drawoff=8,
@@ -35,25 +35,20 @@ def main():
     )
 
     # Load time-series from DHWcalc
-    water_dhwcalc_60 = OpenDHW.import_from_dhwcalc(s_step=s_step, categories=1)
+    timeseries_df_dhwcalc = OpenDHW.import_from_dhwcalc(s_step=s_step,
+                                                        categories=1)
 
     # compare two time-series
     OpenDHW.compare_generators(
-        first_method='DHWcalc',
-        first_series_LperH=water_dhwcalc_60,
-        second_method='OpenDHW',
-        second_series_LperH=water_open_dhw_60,
-        s_step=s_step,
+        timeseries_df_1=timeseries_df_dhwcalc,
+        timeseries_df_2=timeseries_df_gauss,
         start_plot=start_plot,
         end_plot=end_plot,
     )
 
     OpenDHW.compare_generators(
-        first_method='DHWcalc',
-        first_series_LperH=water_dhwcalc_60,
-        second_method='OpenDHW-Beta',
-        second_series_LperH=water_open_dhw_60_beta,
-        s_step=s_step,
+        timeseries_df_1=timeseries_df_dhwcalc,
+        timeseries_df_2=timeseries_df_beta,
         start_plot=start_plot,
         end_plot=end_plot,
     )

@@ -15,25 +15,22 @@ end_plot = '2019-03-08'
 
 def main():
     # Load time-series from DHWcalc
-    water_dhwcalc_60_1 = OpenDHW.import_from_dhwcalc(s_step=60, categories=1,
-                                                     daily_demand=200)
+    timeseries_df = OpenDHW.import_from_dhwcalc(s_step=60, categories=1,
+                                                mean_drawoff_vol_per_day=200)
 
     # Generate Histogram from the loaded timeseries
-    OpenDHW.draw_histplot(dhw_profile_LperH=water_dhwcalc_60_1, s_step=60)
+    OpenDHW.draw_histplot(profile_df=timeseries_df)
 
     # Generate Lineplot from the loaded timeseries
-    OpenDHW.draw_lineplot(method='DHWcalc', s_step=s_step,
-                          series=water_dhwcalc_60_1, start_plot=start_plot,
+    OpenDHW.draw_lineplot(timeseries_df=timeseries_df, start_plot=start_plot,
                           end_plot=end_plot)
 
     # Compute Heat from Water TimeSeries
-    heat_dhwcalc = OpenDHW.compute_heat(s_step=s_step,
-                                        water_LperH=water_dhwcalc_60_1,
+    heat_dhwcalc = OpenDHW.compute_heat(timeseries_df=timeseries_df,
                                         temp_dT=35)
 
     # Generate Lineplot for the heat timeseries
-    OpenDHW.draw_lineplot(method='DHWcalc', s_step=s_step,
-                          series=heat_dhwcalc, series_type='heat',
+    OpenDHW.draw_lineplot(timeseries_df=heat_dhwcalc, plot_var='heat',
                           start_plot=start_plot, end_plot=end_plot)
 
 
