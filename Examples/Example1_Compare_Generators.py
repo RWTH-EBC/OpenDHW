@@ -25,15 +25,6 @@ def main():
         initial_day=0,
     )
 
-    timeseries_df_beta = OpenDHW.generate_dhw_profile(
-        s_step=s_step,
-        weekend_weekday_factor=1.2,
-        mean_vol_per_drawoff=8,
-        mean_drawoff_vol_per_day=200,
-        drawoff_method='beta',
-        initial_day=0,
-    )
-
     # Load time-series from DHWcalc
     timeseries_df_dhwcalc = OpenDHW.import_from_dhwcalc(s_step=s_step,
                                                         categories=1)
@@ -42,13 +33,6 @@ def main():
     OpenDHW.compare_generators(
         timeseries_df_1=timeseries_df_dhwcalc,
         timeseries_df_2=timeseries_df_gauss,
-        start_plot=start_plot,
-        end_plot=end_plot,
-    )
-
-    OpenDHW.compare_generators(
-        timeseries_df_1=timeseries_df_dhwcalc,
-        timeseries_df_2=timeseries_df_beta,
         start_plot=start_plot,
         end_plot=end_plot,
     )
