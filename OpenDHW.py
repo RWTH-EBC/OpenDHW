@@ -22,7 +22,7 @@ sns.set_context("paper")
 def compare_generators(timeseries_df_1, timeseries_df_2,
                        start_plot='2019-03-01', end_plot='2019-03-08',
                        plot_date_slice=True, plot_distribution=True,
-                       save_fig=False):
+                       plot_detailed_distribution=True, save_fig=False):
     """
     Compares two methods of computing the water flow time series by means of
     a subplot.
@@ -37,24 +37,26 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
     """
 
     # compute Stats for first series
-    drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0]
+    drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
+        'Water_LperH']
     yearly_water_demand_1 = timeseries_df_1['Water_L'].sum()
     max_water_flow_1 = timeseries_df_1['Water_LperH'].max()
     s_step_1 = timeseries_df_1.index.freqstr
-    method_1 = timeseries_df_1['Method'][0]
+    method_1 = timeseries_df_1['method'][0]
 
     # compute Stats for second series
-    drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0]
+    drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
+        'Water_LperH']
     yearly_water_demand_2 = timeseries_df_2['Water_L'].sum()
     max_water_flow_2 = timeseries_df_2['Water_LperH'].max()
     s_step_2 = timeseries_df_2.index.freqstr
-    method_2 = timeseries_df_2['Method'][0]
+    method_2 = timeseries_df_2['method'][0]
 
     if plot_date_slice:
 
         # make dataframe for plotting with seaborn
-        plot_df_1 = timeseries_df_1[['Water_LperH', 'Mean_drawoff_vol_per_day']]
-        plot_df_2 = timeseries_df_2[['Water_LperH', 'Mean_drawoff_vol_per_day']]
+        plot_df_1 = timeseries_df_1[['Water_LperH', 'mean_drawoff_vol_per_day']]
+        plot_df_2 = timeseries_df_2[['Water_LperH', 'mean_drawoff_vol_per_day']]
 
         fig, (ax1, ax2) = plt.subplots(2, 1)
         fig.tight_layout()
@@ -98,16 +100,15 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
 
         # plot the distribution
         # https://seaborn.pydata.org/generated/seaborn.displot.html
-        ax1 = sns.histplot(ax=ax1, data=drawoffs_1['Water_LperH'], kde=True)
-        ax2 = sns.histplot(ax=ax2, data=drawoffs_2['Water_LperH'], kde=True)
+        ax1 = sns.histplot(ax=ax1, data=drawoffs_1, kde=True)
+        ax2 = sns.histplot(ax=ax2, data=drawoffs_2, kde=True)
 
         ax1.set_title('Jensen Shannon Distance = {:.4f} \n Water time-series '
                       'from {}, timestep = {}, Yearly Demand = {:.2f} L, '
                       '\n No. Drawoffs = {}, Mean = {:.2f} L/h, Standard '
                       'Deviation = {:.2f} L/h'.format(
             distance, method_1, s_step_1, yearly_water_demand_1,
-            len(drawoffs_1), drawoffs_1['Water_LperH'].mean(), drawoffs_1[
-                'Water_LperH'].std()))
+            len(drawoffs_1), drawoffs_1.mean(), drawoffs_1.std()))
 
         ax1.set_ylabel('Count in a Year')
 
@@ -115,10 +116,67 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
                       'Demand = {:.2f} L, \n No. Drawoffs = {}, Mean = {:.2f}'
                       'L/h, Standard Deviation = {:.2f} L/h'.format(
             method_2, s_step_2, yearly_water_demand_2, len(drawoffs_2),
-            drawoffs_2['Water_LperH'].mean(), drawoffs_2['Water_LperH'].std()))
+            drawoffs_2.mean(), drawoffs_2.std()))
 
         ax2.set_ylabel('Count in a Year')
         ax2.set_xlabel('Flowrate [L/h]')
+
+        plt.show()
+
+    if plot_detailed_distribution:
+
+        # compute Jensen Shannon Distance
+        distance = jensen_shannon_distance(q=timeseries_df_1['Water_LperH'],
+                                           p=timeseries_df_2['Water_LperH'])
+
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        # fig.tight_layout()
+
+        bins = [240, 360, 480, 600, 720, 1200]
+
+        #AX1
+        counts1, bins1, patches1 = ax1.hist(drawoffs_1, bins=bins,
+                                         edgecolor='black')
+
+        # Set the ticks to be at the edges of the bins.
+        ax1.set_xticks(bins1.round(2))
+
+        # Set the graph title and axes titles
+        plt.ylabel('Count')
+        plt.xlabel('Flowrate L/h')
+
+        # Calculate bar centre to display the count of data points and %
+        bin_x_centers1 = 0.5 * np.diff(bins1) + bins1[:-1]
+        bin_y_centers1 = ax1.get_yticks()[1] * 0.25
+
+        # Display the the count of data points and % for each bar in histogram
+        for i in range(len(bins1) - 1):
+            bin_label = "{0:,}".format(counts1[i]) + "  ({0:.2f}%)".format(
+                (counts1[i] / counts1.sum()) * 100)
+            ax1.text(bin_x_centers1[i], bin_y_centers1, bin_label, rotation=90,
+                     rotation_mode='anchor')
+
+        #AX2
+        counts2, bins2, patches2 = ax2.hist(drawoffs_2, bins=bins,
+                                         edgecolor='black')
+
+        # Set the ticks to be at the edges of the bins.
+        ax2.set_xticks(bins2.round(2))
+
+        # Set the graph title and axes titles
+        plt.ylabel('Count')
+        plt.xlabel('Flowrate L/h')
+
+        # Calculate bar centre to display the count of data points and %
+        bin_x_centers2 = 0.5 * np.diff(bins2) + bins2[:-1]
+        bin_y_centers2 = ax2.get_yticks()[1] * 0.25
+
+        # Display the the count of data points and % for each bar in histogram
+        for i in range(len(bins2) - 1):
+            bin_label = "{0:,}".format(counts2[i]) + "  ({0:.2f}%)".format(
+                (counts2[i] / counts2.sum()) * 100)
+            ax2.text(bin_x_centers2[i], bin_y_centers2, bin_label, rotation=90,
+                     rotation_mode='anchor')
 
         plt.show()
 
@@ -179,7 +237,6 @@ def draw_histplot(profile_df):
 
     # get non-zero values of the profile
     drawoffs = profile_df[profile_df['Water_LperH'] > 0]
-
 
     # plot the distribution
     # https://seaborn.pydata.org/generated/seaborn.displot.html
@@ -326,7 +383,6 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
 
 def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
                                          initial_day=0):
-
     p_we = generate_daily_probability_step_function(
         mode='weekend',
         s_step=s_step
@@ -576,11 +632,8 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     water volume consumed per drawoff and the mean water volume consumed per
     day.
 
-    Then, the drawoffs are generated following either a Gauss Distribution (
-    as describesd in the DHWcalc paper) or a beta distribution. The
-    advantage of the Beta Distribution is the ability to directly set values
-    for the minimum and the maximum value. More information on the Beta
-    Distribution can be found at https://en.wikipedia.org/wiki/Beta_distribution
+    Then, the drawoff list are generated following either a Gauss
+    Distribution (as describesd in the DHWcalc paper) or a beta distribution.
 
     :param s_step:                      int     seconds within a timestep
     :param p_norm_integral:             list    min and max values taken
@@ -626,6 +679,9 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
                  range(no_drawoffs_left)]
 
         drawoffs.extend(noise)
+
+        # the underlying noise should be evenly distributed
+        random.shuffle(drawoffs)
 
         # DHWcalc has a set flow rate step rather than a continuous
         # distribution. Thus, we round the drawoff distribution according to
@@ -943,7 +999,7 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
     yearly_water_demand = round(timeseries_df['Water_L'].sum(), 1)  # in L
     max_water_flow = round(timeseries_df['Water_LperH'].max(), 1)  # in L/h
     s_step = timeseries_df.index.freqstr
-    method = timeseries_df['Method'][0]
+    method = timeseries_df['method'][0]
 
     if plot_var == 'water':
         # make dataframe for plotting with seaborn
