@@ -564,6 +564,54 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
     return timeseries_df
 
 
+def generate_dhw_profile_from_drawoffs(s_step, drawoffs,
+                                       weekend_weekday_factor=1.2,
+                                       drawoff_method='gauss_combined',
+                                       mean_vol_per_drawoff=8,
+                                       mean_drawoff_vol_per_day=200,
+                                       initial_day=0):
+    """
+    Generates a DHW profile. The generation is split up in different
+    functions and generally follows the methodology described in the DHWcalc
+    paper from Uni Kassel.
+
+    :param s_step:
+    :param drawoffs:
+    :param weekend_weekday_factor:
+    :param drawoff_method:
+    :param mean_vol_per_drawoff:
+    :param mean_drawoff_vol_per_day:
+    :param initial_day:
+    :return:
+    """
+
+    p_norm_integral = generate_yearly_probability_profile(
+        s_step=s_step,
+        weekend_weekday_factor=1.2,
+        initial_day=0
+    )
+
+    min_rand = min(p_norm_integral)
+    max_rand = max(p_norm_integral)
+    p_drawoffs = [random.uniform(min_rand, max_rand) for i in drawoffs]
+
+    timeseries_df = distribute_drawoffs(
+        drawoffs=drawoffs,
+        p_drawoffs=p_drawoffs,
+        p_norm_integral=p_norm_integral,
+        s_step=s_step
+    )
+
+    timeseries_df['method'] = 'OpenDHW'
+    timeseries_df['drawoff_method'] = drawoff_method
+    timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
+    timeseries_df['initial_day'] = initial_day
+    timeseries_df['weekend_weekday_factor'] = weekend_weekday_factor
+    timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
+
+    return timeseries_df
+
+
 def distribute_average_profile(average_profile, s_step, p_final):
     """
     distribute the average profile.
