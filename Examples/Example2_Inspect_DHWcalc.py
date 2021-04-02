@@ -25,6 +25,8 @@ def main():
     OpenDHW.draw_lineplot(timeseries_df=timeseries_df, start_plot=start_plot,
                           end_plot=end_plot)
 
+    OpenDHW.draw_detailed_histplot(profile_df=timeseries_df)
+
     # Compute Heat from Water TimeSeries
     heat_dhwcalc = OpenDHW.compute_heat(timeseries_df=timeseries_df,
                                         temp_dT=35)

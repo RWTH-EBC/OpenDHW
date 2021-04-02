@@ -15,8 +15,8 @@ def main():
 
     timeseries_df = OpenDHW.generate_dhw_profile(s_step=s_step)
 
-    timeseries_df, save_path = OpenDHW.add_additional_runs(
-        timeseries_df=timeseries_df, total_runs=50)
+    timeseries_df = OpenDHW.add_additional_runs(
+        timeseries_df=timeseries_df, total_runs=50, save_to_csv=True)
 
 
 if __name__ == '__main__':

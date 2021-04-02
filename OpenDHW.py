@@ -12,12 +12,22 @@ import scipy
 from scipy.stats import beta
 import matplotlib.dates as mdates
 
+
+"""
+This is the script that stores all function of the DHWcalc package.
+It is not meant to be exectuted on its own, but rather a toolbox for building
+small scripts. Examples are given in OpenDHW/Examples.
+"""
+
 # RWTH colours
 rwth_blue = "#00549F"
 rwth_red = "#CC071E"
 # sns.set_style("white")
 sns.set_context("paper")
 
+# --- Constants ---
+rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
+cp = 4180  # J/kgK
 
 def compare_generators(timeseries_df_1, timeseries_df_2,
                        start_plot='2019-03-01', end_plot='2019-03-08',
@@ -238,24 +248,25 @@ def draw_histplot(profile_df):
     yearly_water_demand = profile_df['Water_L'].sum()  # in L
 
     # get non-zero values of the profile
-    drawoffs = profile_df[profile_df['Water_LperH'] > 0]
+    drawoffs = profile_df[profile_df['Water_LperH'] > 0]['Water_LperH']
 
     # plot the distribution
     # https://seaborn.pydata.org/generated/seaborn.displot.html
-    ax = sns.histplot(drawoffs, kde=True, palette=[rwth_blue, rwth_red])
+    ax = sns.histplot(drawoffs, kde=True,
+                      # palette=[rwth_blue, rwth_red]
+                      )
 
     # ax2 = ax.twinx()
     # sns.kdeplot(ax=ax2, data=drawoffs, alpha=.25, bw_adjust=0.05)
 
-    # compute some stats
-    drawoffs_mean = drawoffs['Water_LperH'].mean()  # Mean
-    drawoffs_stdev = drawoffs['Water_LperH'].std()  # Standard Deviation
+    # compute seconds in a timestep
     s_step = profile_df.index.freqstr
 
-    ax.set_title('Timestep = {}, Yearly Demand = {} L, \n No. Drawoffs = {}, '
-                 'Mean = {} L/h, Standard Deviation = {} L/h'.format(
-        s_step, yearly_water_demand, len(drawoffs), drawoffs_mean,
-        drawoffs_stdev), fontdict={'fontsize': 10})
+    ax.set_title('Timestep = {}, Yearly Demand = {:.1f} L, \n No. Drawoffs = '
+                 '{}, Mean = {:.2f} L/h, Standard Deviation = {:.2f} '
+                 'L/h'.format(
+        s_step, yearly_water_demand, len(drawoffs), drawoffs.mean(),
+        drawoffs.std()), fontdict={'fontsize': 10})
 
     plt.show()
 
@@ -429,6 +440,9 @@ def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
 
 def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
                                          initial_day=0):
+    """
+    ----- Mix DHWcalc und PyCity Konzepten -----
+    """
     p_we = generate_daily_probability_step_function(
         mode='weekend',
         s_step=s_step
@@ -473,7 +487,20 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
 
 def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
                                         initial_day=0):
+    """
+    generate a summed yearly probabilty profile. The whole function is
+    determiinstc. The same inputs always produce the same outputs.
 
+    1)  Probabilities for weekdays and weekend-days are loaded (p_we, p_wd).
+    2)  Probability of weekend-days is increased relative to weekdays (shift).
+    3)  Based on an initial day, the yearly probability distribution (p_final)
+        is generated. The seasonal influence is modelled by a sine-function.
+    4)  p_final is normalized and integrated. The sum over the year is thus
+        equal to 1 (p_norm_integral).
+
+    """
+
+    # load daily probabilities (deterministic)
     p_we = generate_daily_probability_step_function(
         mode='weekend',
         s_step=s_step
@@ -484,12 +511,14 @@ def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
         s_step=s_step
     )
 
+    # shift towards weekend (deterministic)
     p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
         p_weekday=p_wd,
         p_weekend=p_we,
         factor=weekend_weekday_factor
     )
 
+    # yearly curve (deterministic)
     p_final = generate_yearly_probabilities(
         initial_day=initial_day,
         p_weekend=p_we_weighted,
@@ -533,6 +562,7 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
     :return:
     """
 
+    # deterministic
     p_norm_integral = generate_yearly_probability_profile(
         s_step=s_step,
         weekend_weekday_factor=1.2,
@@ -775,14 +805,28 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
         low_lim = mu - 2 * sig
         up_lim = mu + 2 * sig
 
-        # cut gauss distribution
-        drawoffs = [i for i in drawoffs if low_lim < i < up_lim]
+        # cut gauss distribution, lowers standard-deviation. keeps Mean.
+        drawoffs_reduced = [i for i in drawoffs if low_lim < i < up_lim]
+
+        cut = [i for i in drawoffs if i <= low_lim or up_lim <= i]
+
+        drawoffs = drawoffs_reduced
+
+        mean_flow_rate_noise = ((max_drawoff_flow_rate - up_lim) / 2) + up_lim
+
+        water_left = sum(cut) / 3600 * s_step   # in L
+
+        hours_left = water_left / mean_flow_rate_noise
+
+        no_drawoffs_left3 = int(hours_left * 3600 / s_step)
+
+        no_drawoffs_left2 = int(water_left / mean_vol_per_drawoff)
 
         curr_no_drawoffs = len(drawoffs)
         no_drawoffs_left = total_drawoffs - curr_no_drawoffs
 
-        noise = [random.randint(low_lim, max_drawoff_flow_rate) for i in
-                 range(no_drawoffs_left)]
+        noise = [random.randint(up_lim, max_drawoff_flow_rate) for i in
+                 range(no_drawoffs_left3)]
 
         drawoffs.extend(noise)
 
@@ -1063,13 +1107,10 @@ def compute_heat(timeseries_df, temp_dT=35):
     :return: timeseries_df:     Dataframe with added 'Heat' Column
     """
 
-    rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
-    cp = 4180  # J/kgK
-
     timeseries_df['Heat_W'] = timeseries_df[
                                   'Water_LperSec'] * rho * cp * temp_dT
 
-    return timeseries_df  # in kWh
+    return timeseries_df
 
 
 def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
@@ -1109,7 +1150,7 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
 
     if plot_var == 'water':
         # make dataframe for plotting with seaborn
-        plot_df = timeseries_df[['Water_LperH', 'Daily_Demand']]
+        plot_df = timeseries_df[['Water_LperH', 'mean_drawoff_vol_per_day']]
 
         ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
@@ -1117,7 +1158,7 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
         ax1.legend(loc="upper left")
 
         plt.title('Water Time-series from {}, timestep = {}\n'
-                  'Yearly Water Demand = {} L with a Peak of {} L/h'.format(
+                  'Yearly Water Demand = {:.1f} L with a Peak of {:.2f} L/h'.format(
             method, s_step, yearly_water_demand, max_water_flow))
 
     if plot_var == 'heat':
@@ -1130,7 +1171,7 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
         ax1.legend(loc="upper left")
 
         plt.title('Heat Time-series from {}, timestep = {}\n'
-                  'with a Peak of {} L/h'.format(method, s_step,
+                  'with a Peak of {:.2f} L/h'.format(method, s_step,
                                                  max_water_flow))
 
     # set the x axis ticks
@@ -1219,17 +1260,28 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
     cols_LperH = [name for name in col_names if col_part in name]
     water_LperH_df = timeseries_df[cols_LperH]
 
-    # generate drawoff Dataframe. From each column, get only values > 0.
-    # Index Colum is not the DatetimeIndex anymore, as values in a single row
-    # do not correspond to a single Date!
-    drawoffs_df = pd.DataFrame(columns=cols_LperH)
+    #  generate drawoff Dataframe. initially, it has the same length as the
+    #  timeseries_df. Index Column is not the DatetimeIndex anymore, as values
+    #  in a single row do not correspond to a single Date!
+    drawoffs_df = pd.DataFrame(columns=cols_LperH,
+                               index=range(len(timeseries_df)))
 
     for col_name in cols_LperH:
 
+        #  From each column, get only values > 0.
         drawoffs_series = water_LperH_df[water_LperH_df[col_name] > 0][col_name]
-        drawoffs_list = list(drawoffs_series)
-        drawoffs_list.sort()
-        drawoffs_df[col_name] = drawoffs_list
+        drawoffs_lst = list(drawoffs_series)
+
+        #  fill values with zeros with NaN's
+        empty_cells_len = len(timeseries_df) - len(drawoffs_lst)
+        empty_cells_lst = [np.nan] * empty_cells_len
+        drawoffs_lst.extend(empty_cells_lst)
+        drawoffs_lst.sort()
+
+        drawoffs_df[col_name] = drawoffs_lst
+
+    # Drop rows that have only NaN's as values
+    drawoffs_df = drawoffs_df.dropna(how='all')
 
     return drawoffs_df, water_LperH_df
 
