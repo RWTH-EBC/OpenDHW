@@ -785,7 +785,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
 
-    sdt_dev_drawoff_flow_rate = 120  # in L/h
+    sdt_dev_drawoff_flow_rate = av_drawoff_flow_rate / 4  # in L/h
 
     mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
 
@@ -814,6 +814,8 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
         mean_flow_rate_noise = ((max_drawoff_flow_rate - up_lim) / 2) + up_lim
 
+        # after we cut the distribution, we have to distribute the remaining
+        # drawoofs. Multiple Options possible.
         water_left = sum(cut) / 3600 * s_step   # in L
 
         hours_left = water_left / mean_flow_rate_noise

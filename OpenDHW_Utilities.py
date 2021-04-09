@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 import numpy as np
-import os
-import platform
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
 from pathlib import Path
+from datetime import datetime
 
 # use RWTH Colors
 rwth_blue = "#00549F"
@@ -17,11 +16,9 @@ rwth_red = "#CC071E"
 dir_mpl_repo = "/Users/jonasgrossmann/git_repos"
 plt.style.use(dir_mpl_repo + "/matplolib-style/ebc.paper.mplstyle")
 
-# plots
-
 
 def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
-                                     V_stor=300, dT_stor=55,
+                                     dir_output, V_stor=300, dT_stor=55,
                                      dT_threshhold=10, Qcon_flow_max=5000,
                                      plot_cum_demand=False, with_losses=True,
                                      save_fig=True):
@@ -34,6 +31,7 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
     heatpump still acts as if a storage is supplied. Based on DIN EN 12831-3.
 
     :param timeseries_df:   stores the DHW-demand profile in [W] per Timestep
+    :param dir_output:      directory where figure is saved
     :param V_stor:          Storage Volume in Liters
     :param dT_stor:         max dT in Storage
     :param dT_threshhold:   max dT Drop before Storage needs to be re-heated
@@ -48,13 +46,13 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
     :return: storage_load:  DHW-profile that re-heats a storage.
     """
 
-    # convert the DHW demand from Watt to Joule
+    # --- convert the DHW Demand ---
     s_step = int(timeseries_df.index.freqstr[:-1])
     timeseries_df['Heat_J'] = timeseries_df['Heat_W'] * s_step
     timeseries_df['Heat_kW'] = timeseries_df['Heat_W'] / 1000
     timeseries_df['Heat_kWh'] = timeseries_df['Heat_J'] / (3600 * 1000)
 
-    # --------- Storage Data ---------------
+    # --- Storage Data ---
     # Todo: think about how Parameters should be for Schichtspeicher
     rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
     m_w = V_stor * rho  # Mass Water in Storage
@@ -72,9 +70,7 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
     loss_load = []
     fill_storage = False
 
-    heat_J = list(timeseries_df['Heat_J'])
-
-    for t_step, dem_step in enumerate(heat_J, start=0):
+    for t_step, dem_step in enumerate(timeseries_df['Heat_J'], start=0):
         storage_level.append(Q_storr_curr)
         if with_losses:
             Q_loss = (Q_storr_curr * 0.001 * s_step) / 3600  # 0,1% Loss/Hour
@@ -86,7 +82,7 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
         if len(storage_load) == 0:
             Q_storr_curr = Q_storr_curr - dem_step - Q_loss
         else:
-            Q_storr_curr = Q_storr_curr - dem_step - Q_loss\
+            Q_storr_curr = Q_storr_curr - dem_step - Q_loss \
                            + storage_load[t_step - 1]
 
         if Q_storr_curr >= Q_full:  # storage full, dont fill it!
@@ -121,9 +117,9 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
     # print out total demands and Difference between them
     print("Sum DHW Demand = {:.2f} kWh".format(sum(timeseries_df['Heat_kWh'])))
     print("Sum Storage Demand = {:.2f} kWh".format(sum(timeseries_df[
-                                                       'StorageLoad_kWh'])))
+                                                           'StorageLoad_kWh'])))
     print("Sum Storage Losses = {:.2f} kWh".format(sum(timeseries_df[
-                                                       'StorageLosses_kWh'])))
+                                                           'StorageLosses_kWh'])))
 
     diff = timeseries_df['Heat_kWh'].sum() + timeseries_df[
         'StorageLosses_kWh'].sum() - timeseries_df['StorageLoad_kWh'].sum()
@@ -183,11 +179,11 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
         fig.tight_layout()
 
         ax1_data = timeseries_df[['Heat_Sumline_kWh',
-                                  'StorageLoad_Sumline_kWh']][start_plot:end_plot]
+                                  'StorageLoad_Sumline_kWh']][
+                   start_plot:end_plot]
         ax1 = sns.lineplot(data=ax1_data.resample(resample_delta).mean(),
                            dashes=[(6, 2), (6, 2)], linewidth=1.2,
                            palette=[rwth_blue, rwth_orange])
-        ax1.grid(False)
 
         ymin1, ymax1 = ax1.get_ylim()
         ax1.set_ylim(ymin1, ymax1 * 1.01)
@@ -195,18 +191,17 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
         ax2 = ax1.twinx()
         ax2_data = timeseries_df[['Heat_kW', 'StorageLoad_kW']][
                    start_plot:end_plot]
-        ax2 = sns.lineplot(data=ax2_data.resample(resample_delta).mean(),
-                           dashes=False, linewidth=1,
-                           palette=[rwth_blue, rwth_orange])
+        sns.lineplot(ax=ax2, data=ax2_data.resample(resample_delta).mean(),
+                     dashes=False, linewidth=1,
+                     palette=[rwth_blue, rwth_orange])
 
         ymin2, ymax2 = ax2.get_ylim()
         ax2.set_ylim(ymin2, ymax2 * 1.03)
 
         ax3 = ax1.twinx()
         ax3_data = timeseries_df[['StorageLosses_W']][start_plot:end_plot]
-        ax3 = sns.lineplot(data=ax3_data.resample(resample_delta).mean(),
-                           dashes=False, linewidth=0.7,
-                           palette=[rwth_red])
+        sns.lineplot(ax=ax3, data=ax3_data.resample(resample_delta).mean(),
+                     dashes=False, linewidth=0.7, palette=[rwth_red])
 
         ymin3, ymax3 = ax3.get_ylim()
         ax3.set_ylim(ymin3, ymax3 * 1.1)
@@ -217,13 +212,14 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
         ax1.legend_.remove()
         ax2.legend_.remove()
         ax3.legend_.remove()
-        fig.legend(loc="upper left", bbox_to_anchor=(0.12, 0.9), frameon=True,
-                   # prop={'size': 6}
+        fig.legend(loc="upper left", bbox_to_anchor=(0.1, 0.9), frameon=True,
+                   prop={'size': 8}
                    )
 
-        ax1.set_ylabel('cumulative Demand and Supply in kWh')
-        ax2.set_ylabel('current Demand and Supply in kW')
-        ax3.set_ylabel('Losses in W')
+        ax1.set_ylabel('cumulative Demand and Supply [kWh]')
+        ax2.set_ylabel('current Demand and Supply [kW]')
+        ax3.set_ylabel('Losses [W]')
+        ax1.grid(False)
         ax2.grid(False)
         ax3.grid(False)
 
@@ -236,19 +232,22 @@ def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,
 
         # Count number of clusters of non-zero values ("peaks").
         # One Peak is comprised by 2 HP mode switches.
-        dhw_peaks = int(np.diff(np.concatenate([[0], list(timeseries_df[
-            'Heat_J']), [0]]) == 0).sum() / 2)
-        stor_peaks = int(np.diff(np.concatenate([[0], list(timeseries_df[
-            'StorageLoad_J']), [0]]) == 0).sum() / 2)
+        dhw_peaks = int(np.diff(np.concatenate(
+            [[0], list(timeseries_df['Heat_J']), [0]]) == 0).sum() / 2)
+        stor_peaks = int(np.diff(np.concatenate(
+            [[0], list(timeseries_df['StorageLoad_J']), [0]]) == 0).sum() / 2)
 
-        plt.title('Demand ({} Peaks, {} per Day) and Storage ({} Peaks, {} per Day'
-                  ')'.format(dhw_peaks, round(dhw_peaks/365, 2), stor_peaks,
-                             round(stor_peaks/365, 2)))
+        method = timeseries_df['method'][0]
+
+        plt.title('{} Demand ({} Peaks, {} per Day) and Storage ({} Peaks, '
+                  '{} per Day)'.format(method, dhw_peaks, round(dhw_peaks /
+                                                               365, 2),
+                                       stor_peaks, round(stor_peaks / 365, 2)))
         plt.show()
 
         if save_fig:
-            dir_output = Path.cwd() / "plots"
-            dir_output.mkdir(exist_ok=True)
-            fig.savefig(dir_output / "Summenlinien_Diagramm.pdf")
+            save_name = 'Storage_Load_' + str(datetime.now().strftime(
+                '%Y_%m_%d_%H_%M_%S')) + '.pdf'
+            fig.savefig(dir_output / save_name)
 
     return timeseries_df
