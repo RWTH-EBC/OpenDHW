@@ -15,8 +15,11 @@ import matplotlib.dates as mdates
 
 """
 This is the script that stores all function of the DHWcalc package.
-It is not meant to be exectuted on its own, but rather a toolbox for building
+It is not meant to be executed on its own, but rather a toolbox for building
 small scripts. Examples are given in OpenDHW/Examples.
+
+OpenDHW_Utilities stores a few other functions that do not generate DHW 
+Timeseries directly, like the StorageLoad Function.
 """
 
 # RWTH colours
@@ -28,6 +31,7 @@ sns.set_context("paper")
 # --- Constants ---
 rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
 cp = 4180  # J/kgK
+
 
 def compare_generators(timeseries_df_1, timeseries_df_2,
                        start_plot='2019-03-01', end_plot='2019-03-08',
@@ -94,6 +98,23 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
 
         ax2.legend(loc="upper left")
 
+        # --- set both aes to the same y limit ---
+        ymin1, ymax1 = ax1.get_ylim()
+        ymin2, ymax2 = ax2.get_ylim()
+
+        ymax_set = max(ymax1, ymax2)
+
+        ax1.set_ylim(ymin1, ymax_set)
+        ax2.set_ylim(ymin2, ymax_set)
+
+        # --- beautiful x-ticks ---
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax1.xaxis.set_major_locator(locator)
+        ax1.xaxis.set_major_formatter(formatter)
+        ax2.xaxis.set_major_locator(locator)
+        ax2.xaxis.set_major_formatter(formatter)
+
         plt.show()
 
         if save_fig:
@@ -132,6 +153,15 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         ax2.set_ylabel('Count in a Year')
         ax2.set_xlabel('Flowrate [L/h]')
 
+        # --- set both aes to the same y limit ---
+        ymin1, ymax1 = ax1.get_ylim()
+        ymin2, ymax2 = ax2.get_ylim()
+
+        ymax_set = max(ymax1, ymax2)
+
+        ax1.set_ylim(ymin1, ymax_set)
+        ax2.set_ylim(ymin2, ymax_set)
+
         plt.show()
 
     if plot_detailed_distribution:
@@ -150,6 +180,7 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         drawoffs_lst = [drawoffs_1, drawoffs_2]
 
         bin_values = [240, 360, 480, 600, 720, 1200]
+        # todo: dont hardcode bins!
 
         for sub_i, drawoffs_i in enumerate(drawoffs_lst):
 
@@ -189,6 +220,15 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
 
         ax2.set_ylabel('Count in a Year')
         ax2.set_xlabel('Flowrate [L/h]')
+
+        # --- set both aes to the same y limit ---
+        ymin1, ymax1 = ax1.get_ylim()
+        ymin2, ymax2 = ax2.get_ylim()
+
+        ymax_set = max(ymax1, ymax2)
+
+        ax1.set_ylim(ymin1, ymax_set)
+        ax2.set_ylim(ymin2, ymax_set)
 
         plt.show()
 
@@ -1009,6 +1049,8 @@ def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
     :return: p_day      list:   the probability distribution for one day.
     """
 
+    # todo: add profiles for non-residential buildings
+
     if mode == 'weekday':
 
         steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
@@ -1111,6 +1153,11 @@ def compute_heat(timeseries_df, temp_dT=35):
 
     timeseries_df['Heat_W'] = timeseries_df[
                                   'Water_LperSec'] * rho * cp * temp_dT
+
+    s_step = int(timeseries_df.index.freqstr[:-1])
+    timeseries_df['Heat_J'] = timeseries_df['Heat_W'] * s_step
+    timeseries_df['Heat_kW'] = timeseries_df['Heat_W'] / 1000
+    timeseries_df['Heat_kWh'] = timeseries_df['Heat_J'] / (3600 * 1000)
 
     return timeseries_df
 
