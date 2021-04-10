@@ -9,7 +9,9 @@ import math
 import statistics
 import random
 import matplotlib.dates as mdates
+import OpenDHW
 
+# pycity base has to be installed
 import pycity_base.classes.demand.domestic_hot_water as dhw
 import pycity_base.classes.timer as time
 import pycity_base.classes.weather as weath
@@ -18,9 +20,16 @@ import pycity_base.classes.environment as env
 import pycity_base.classes.demand.occupancy as occ
 
 
-def main():
+"""
+This script stores some function from the EON.EBC PyCity package. And 
+functions that are inspired by the EBC Package.
 
-    pass
+It is not meant to be executed on its own, but rather a toolbox for building
+small scripts.
+
+OpenDHW_Utilities stores a few other functions that do not generate DHW 
+Timeseries directly, like the StorageLoad Function.
+"""
 
 
 def generate_dhw_profile_pycity_alias(s_step=60, initial_day=0,
@@ -128,19 +137,6 @@ def generate_dhw_profile_pycity_alias(s_step=60, initial_day=0,
 
     water_LperH = water
 
-    # Plot
-    dhw_demand = compute_stats_and_plot_demand(
-        method='DHWcalc_Alias',
-        s_step=s_step,
-        water_LperH=water_LperH,
-        start_plot=start_plot,
-        end_plot=end_plot,
-        temp_dT=temp_dT,
-        print_stats=print_stats,
-        plot_demand=plot_demand,
-        save_fig=save_fig
-    )
-
 
 def generate_dhw_profile_pycity(s_step=60, temp_dT=35, print_stats=True,
                                 plot_demand=True, start_plot='2019-08-01',
@@ -177,21 +173,168 @@ def generate_dhw_profile_pycity(s_step=60, temp_dT=35, print_stats=True,
     water_LperSec = [i / (rho * cp * temp_diff) for i in dhw_demand]
     water_LperH = [x * 3600 for x in water_LperSec]
 
-    # Plot
-    dhw_demand2 = compute_stats_and_plot_demand(
-        method='DHWcalc_Alias',
-        s_step=s_step,
-        water_LperH=water_LperH,
-        start_plot=start_plot,
-        end_plot=end_plot,
-        temp_dT=temp_dT,
-        print_stats=print_stats,
-        plot_demand=plot_demand,
-        save_fig=save_fig
-    )
-
     return dhw_demand, water_LperH
 
 
-if __name__ == '__main__':
-    main()
+def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
+                                         initial_day=0):
+    """
+    ----- Mix DHWcalc and PyCity Concepts -----
+    """
+    p_we = OpenDHW.generate_daily_probability_step_function(
+        mode='weekend',
+        s_step=s_step
+    )
+
+    p_wd = OpenDHW.generate_daily_probability_step_function(
+        mode='weekday',
+        s_step=s_step
+    )
+
+    p_wd_weighted, p_we_weighted, av_p_week_weighted = \
+        OpenDHW.shift_weekend_weekday(
+        p_weekday=p_wd,
+        p_weekend=p_we,
+        factor=weekend_weekday_factor
+    )
+
+    average_profile = generate_average_daily_profile(
+        mode='gauss_abs',
+        l_day=200,
+        sigma_day=70,
+        av_p_day=av_p_week_weighted,
+        s_step=s_step,
+    )
+
+    p_final = OpenDHW.generate_yearly_probabilities(
+        initial_day=initial_day,
+        p_weekend=p_we_weighted,
+        p_weekday=p_wd_weighted,
+        s_step=s_step
+    )
+
+    p_final = OpenDHW.normalize_list_to_max(lst=p_final)
+
+    water_LperH = OpenDHW.distribute_average_profile(
+        average_profile=average_profile,
+        p_final=p_final,
+        s_step=s_step
+    )
+
+    return water_LperH
+
+
+def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
+                                   s_step, plot_profile=False):
+    """
+    Generates an average profile for daily water drawoffs. The total amount
+    of water in the average profile has to be higher than the demanded water
+    per day, as the average profile is multiplied by the average probability
+    each day. two modes are given to generate the average profile.
+
+    :param mode:            string: type of probability distribution
+    :param l_day:           float:  mean value of resulting profile
+    :param sigma_day:       float:  standard deviation of resulting profile
+    :param av_p_day:        float:  average probability of
+    :param s_step:          int:    seconds within a time step
+    :param plot_profile:    bool:   decide to plot the profile
+
+    :return: average_profile:   list:   average water drawoff profile in L/h
+                                        per timestep
+    """
+
+    timesteps_day = int(24 * 3600 / s_step)
+
+    l_av_profile = l_day / av_p_day
+    sigma_av_profile = sigma_day / av_p_day
+
+    LperH_step_av_profile = l_av_profile / 24
+    sigma_step_av_profile = sigma_av_profile / 24
+
+    if mode == 'gauss':
+
+        # problem: generates negative values.
+
+        average_profile = [random.gauss(LperH_step_av_profile,
+                                        sigma=sigma_step_av_profile) for i in
+                           range(timesteps_day)]
+
+        if min(average_profile) < 0:
+            raise Exception("negative values in average profiles detected. "
+                            "Choose a different mean or standard deviation, "
+                            "or choose a differnt mode to create the average "
+                            "profile.")
+
+    elif mode == 'gauss_abs':
+
+        # If we take the absolute of the gauss distribution, we have no more
+        # negative values, but the mean and standard deviation changes,
+        # and more than 200 L/d are being consumed.
+
+        average_profile = [random.gauss(LperH_step_av_profile,
+                                        sigma=sigma_step_av_profile) for i in
+                           range(timesteps_day)]
+
+        average_profile_abs = [abs(entry) for entry in average_profile]
+
+        if statistics.mean(average_profile) != statistics.mean(
+                average_profile_abs):
+            scale = statistics.mean(average_profile) / statistics.mean(
+                average_profile_abs)
+
+            average_profile = [i * scale for i in average_profile_abs]
+
+    elif mode == 'lognormal':
+
+        # problem: understand the settings of the lognormal function.
+        # https://en.wikipedia.org/wiki/Log-normal_distribution
+
+        m = LperH_step_av_profile
+        sigma = sigma_step_av_profile / 40
+
+        v = sigma ** 2
+        norm_mu = np.log(m ** 2 / np.sqrt(v + m ** 2))
+        norm_sigma = np.sqrt((v / m ** 2) + 1)
+
+        average_profile = np.random.lognormal(norm_mu, norm_sigma,
+                                              timesteps_day)
+
+    else:
+        raise Exception("Unkown Mode for average daily water profile "
+                        "geneartion")
+
+    if plot_profile:
+        mean = [statistics.mean(average_profile) for i in average_profile]
+        plt.plot(average_profile)
+        plt.plot(mean)
+        plt.show()
+
+    return average_profile
+
+
+def distribute_average_profile(average_profile, s_step, p_final):
+    """
+    distribute the average profile.
+
+    :param average_profile:
+    :param s_step:
+    :param p_final:
+    :return:
+    """
+
+    average_profile = average_profile * 365
+
+    timesteps_day = int(24 * 3600 / s_step)
+
+    water_LperH = []
+
+    for step in range(365 * timesteps_day):
+
+        if random.random() < p_final[step]:
+
+            water_t = random.gauss(average_profile[step], sigma=114.33)
+            water_LperH.append(abs(water_t))
+        else:
+            water_LperH.append(0)
+
+    return water_LperH

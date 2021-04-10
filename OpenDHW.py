@@ -403,141 +403,6 @@ def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
     return p_wd_weighted, p_we_weighted, av_p_week_weighted
 
 
-def generate_average_daily_profile(mode, l_day, sigma_day, av_p_day,
-                                   s_step, plot_profile=False):
-    """
-    Generates an average profile for daily water drawoffs. The total amount
-    of water in the average profile has to be higher than the demanded water
-    per day, as the average profile is multiplied by the average probability
-    each day. two modes are given to generate the average profile.
-
-    :param mode:            string: type of probability distribution
-    :param l_day:           float:  mean value of resulting profile
-    :param sigma_day:       float:  standard deviation of resulting profile
-    :param av_p_day:        float:  average probability of
-    :param s_step:          int:    seconds within a time step
-    :param plot_profile:    bool:   decide to plot the profile
-
-    :return: average_profile:   list:   average water drawoff profile in L/h
-                                        per timestep
-    """
-
-    timesteps_day = int(24 * 3600 / s_step)
-
-    l_av_profile = l_day / av_p_day
-    sigma_av_profile = sigma_day / av_p_day
-
-    LperH_step_av_profile = l_av_profile / 24
-    sigma_step_av_profile = sigma_av_profile / 24
-
-    if mode == 'gauss':
-
-        # problem: generates negative values.
-
-        average_profile = [random.gauss(LperH_step_av_profile,
-                                        sigma=sigma_step_av_profile) for i in
-                           range(timesteps_day)]
-
-        if min(average_profile) < 0:
-            raise Exception("negative values in average profiles detected. "
-                            "Choose a different mean or standard deviation, "
-                            "or choose a differnt mode to create the average "
-                            "profile.")
-
-    elif mode == 'gauss_abs':
-
-        # If we take the absolute of the gauss distribution, we have no more
-        # negative values, but the mean and standard deviation changes,
-        # and more than 200 L/d are being consumed.
-
-        average_profile = [random.gauss(LperH_step_av_profile,
-                                        sigma=sigma_step_av_profile) for i in
-                           range(timesteps_day)]
-
-        average_profile_abs = [abs(entry) for entry in average_profile]
-
-        if statistics.mean(average_profile) != statistics.mean(
-                average_profile_abs):
-            scale = statistics.mean(average_profile) / statistics.mean(
-                average_profile_abs)
-
-            average_profile = [i * scale for i in average_profile_abs]
-
-    elif mode == 'lognormal':
-
-        # problem: understand the settings of the lognormal function.
-        # https://en.wikipedia.org/wiki/Log-normal_distribution
-
-        m = LperH_step_av_profile
-        sigma = sigma_step_av_profile / 40
-
-        v = sigma ** 2
-        norm_mu = np.log(m ** 2 / np.sqrt(v + m ** 2))
-        norm_sigma = np.sqrt((v / m ** 2) + 1)
-
-        average_profile = np.random.lognormal(norm_mu, norm_sigma,
-                                              timesteps_day)
-
-    else:
-        raise Exception("Unkown Mode for average daily water profile "
-                        "geneartion")
-
-    if plot_profile:
-        mean = [statistics.mean(average_profile) for i in average_profile]
-        plt.plot(average_profile)
-        plt.plot(mean)
-        plt.show()
-
-    return average_profile
-
-
-def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
-                                         initial_day=0):
-    """
-    ----- Mix DHWcalc und PyCity Konzepten -----
-    """
-    p_we = generate_daily_probability_step_function(
-        mode='weekend',
-        s_step=s_step
-    )
-
-    p_wd = generate_daily_probability_step_function(
-        mode='weekday',
-        s_step=s_step
-    )
-
-    p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
-        p_weekday=p_wd,
-        p_weekend=p_we,
-        factor=weekend_weekday_factor
-    )
-
-    average_profile = generate_average_daily_profile(
-        mode='gauss_abs',
-        l_day=200,
-        sigma_day=70,
-        av_p_day=av_p_week_weighted,
-        s_step=s_step,
-    )
-
-    p_final = generate_yearly_probabilities(
-        initial_day=initial_day,
-        p_weekend=p_we_weighted,
-        p_weekday=p_wd_weighted,
-        s_step=s_step
-    )
-
-    p_final = normalize_list_to_max(lst=p_final)
-
-    water_LperH = distribute_average_profile(
-        average_profile=average_profile,
-        p_final=p_final,
-        s_step=s_step
-    )
-
-    return water_LperH
-
-
 def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
                                         initial_day=0):
     """
@@ -640,6 +505,7 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
     timeseries_df['method'] = 'OpenDHW'
     timeseries_df['drawoff_method'] = drawoff_method
     timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
+    timeseries_df['sdtdev_drawoff_vol_per_day'] = mean_drawoff_vol_per_day / 4
     timeseries_df['initial_day'] = initial_day
     timeseries_df['weekend_weekday_factor'] = weekend_weekday_factor
     timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
@@ -693,34 +559,6 @@ def generate_dhw_profile_from_drawoffs(s_step, drawoffs,
     timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
 
     return timeseries_df
-
-
-def distribute_average_profile(average_profile, s_step, p_final):
-    """
-    distribute the average profile.
-
-    :param average_profile:
-    :param s_step:
-    :param p_final:
-    :return:
-    """
-
-    average_profile = average_profile * 365
-
-    timesteps_day = int(24 * 3600 / s_step)
-
-    water_LperH = []
-
-    for step in range(365 * timesteps_day):
-
-        if random.random() < p_final[step]:
-
-            water_t = random.gauss(average_profile[step], sigma=114.33)
-            water_LperH.append(abs(water_t))
-        else:
-            water_LperH.append(0)
-
-    return water_LperH
 
 
 def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
@@ -1305,12 +1143,17 @@ def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
 
     if save_to_csv:
 
+        # set a name for the file
         save_name = "{}_{}runs_{}L_{}min_{}LperDrawoff.csv".format(
             method, total_runs, mean_drawoff_vol_per_day, int(s_step / 60),
             mean_vol_per_drawoff)
 
-        save_path = Path.cwd().parent / "Saved_Timeseries" / save_name
-        timeseries_df.to_csv(save_path)
+        # make a directory. if it already exists, no problemooo, just use it
+        save_dir = Path.cwd().parent / "Saved_Timeseries"
+        save_dir.mkdir(exist_ok=True)
+
+        # save the dataframe in the folder as a csv with the chosen name
+        timeseries_df.to_csv(save_dir / save_name)
 
     return timeseries_df
 
@@ -1405,3 +1248,27 @@ def jensen_shannon_distance(p, q):
     distance = np.sqrt(divergence)
 
     return round(distance, 4)
+
+
+def get_s_step(timeseries_df):
+    """
+    get the seconds within a timestep from a pandas dataframe. When loading
+    Dataframes from a csv, the index loses its 'freq' attribute. This is thus
+    just a workaround when loading Timeseries from csv.
+    """
+
+    try:
+        s_step = int(timeseries_df.index.freqstr[:-1])
+        # todo: why doesnt this work for Dataframes loaded from a csv?
+
+    except TypeError:
+
+        steps = len(timeseries_df)
+        secs_in_year = 8760 * 60 * 60
+        s_step = secs_in_year/steps
+
+        # check if s_step has no decimal points (should not be 60.01 f.e.)
+        assert s_step % 1 == 0
+        s_step = int(s_step)
+
+    return s_step
