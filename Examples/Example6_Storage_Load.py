@@ -27,7 +27,8 @@ def main():
     timeseries_df = OpenDHW.import_from_dhwcalc(
         s_step=s_step,
         categories=1,
-        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
+        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        daylight_saving=False
     )
 
     # Compute Heat from Water TimeSeries
@@ -48,8 +49,6 @@ def main():
     # generate time-series with OpenDHW
     timeseries_df_gauss = OpenDHW.generate_dhw_profile(
         s_step=s_step,
-        weekend_weekday_factor=1.2,
-        mean_vol_per_drawoff=8,
         mean_drawoff_vol_per_day=200,
         drawoff_method='gauss_combined',
         initial_day=0,
@@ -69,8 +68,6 @@ def main():
         plot_cum_demand=True,
         save_fig=False
     )
-
-    pass
 
 
 if __name__ == '__main__':
