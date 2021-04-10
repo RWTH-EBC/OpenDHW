@@ -235,19 +235,32 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
     return
 
 
-def import_from_dhwcalc(s_step, categories, mean_drawoff_vol_per_day=200):
+def import_from_dhwcalc(s_step, categories, daylight_saving,
+                        mean_drawoff_vol_per_day=200, max_flowrate=1200):
     """
     DHWcalc yields Volume Flow TimeSeries (in Liters per hour).
 
     :param  s_step:         int:    resolution of output file in seconds
     :param  categories:     int:    either '1' or '4', see DHWcalc settings
     :param  mean_drawoff_vol_per_day:   int:    daily water demand in Liters
+    :param  daylight_saving:    Bool:   decide to apply daylight saving or not
+    :param  max_flowrate:   int:    maximum water flowrate in L/h
 
     :return dhw_demand: list:   each timestep contains the Energyflow in [W]
     """
 
-    dhw_file = "{}L_{}min_{}cat_step_functions.txt".format(
-        mean_drawoff_vol_per_day, int(s_step / 60), categories)
+    if daylight_saving:
+        ds_string = 'ds'
+    else:
+        ds_string = 'nods'
+
+    dhw_file = "{vol}L_{s_step}min_{cats}cat_sf_{ds}_max{max_flow}.txt".format(
+        vol=mean_drawoff_vol_per_day,
+        s_step=int(s_step / 60),
+        cats=categories,
+        ds=ds_string,
+        max_flow=max_flowrate,
+    )
 
     dhw_profile = Path.cwd().parent / "DHWcalc_Files" / dhw_file
 
