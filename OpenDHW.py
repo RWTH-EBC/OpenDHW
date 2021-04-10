@@ -12,7 +12,6 @@ import scipy
 from scipy.stats import beta
 import matplotlib.dates as mdates
 
-
 """
 This is the script that stores all function of the DHWcalc package.
 It is not meant to be executed on its own, but rather a toolbox for building
@@ -235,7 +234,7 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
     return
 
 
-def import_from_dhwcalc(s_step, categories, daylight_saving,
+def import_from_dhwcalc(s_step, daylight_saving, categories=1,
                         mean_drawoff_vol_per_day=200, max_flowrate=1200):
     """
     DHWcalc yields Volume Flow TimeSeries (in Liters per hour).
@@ -282,6 +281,7 @@ def import_from_dhwcalc(s_step, categories, daylight_saving,
     timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
     timeseries_df['method'] = 'DHWcalc'
     timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
+    timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day / 4
     timeseries_df['categories'] = categories
     timeseries_df['initial_day'] = 0
     timeseries_df['weekend_weekday_factor'] = 1.2
@@ -325,7 +325,6 @@ def draw_histplot(profile_df):
 
 
 def draw_detailed_histplot(profile_df, bins=(240, 360, 480, 600, 720, 1200)):
-
     """
     https://towardsdatascience.com/advanced-histogram-using-python-bceae288e715
 
@@ -707,7 +706,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
         # after we cut the distribution, we have to distribute the remaining
         # drawoofs. Multiple Options possible.
-        water_left = sum(cut) / 3600 * s_step   # in L
+        water_left = sum(cut) / 3600 * s_step  # in L
 
         hours_left = water_left / mean_flow_rate_noise
 
@@ -1072,7 +1071,7 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
 
         plt.title('Heat Time-series from {}, timestep = {}\n'
                   'with a Peak of {:.2f} L/h'.format(method, s_step,
-                                                 max_water_flow))
+                                                     max_water_flow))
 
     # set the x axis ticks
     # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
@@ -1097,7 +1096,6 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
 
 
 def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
-
     added_runs = total_runs - 1
 
     s_step = int(timeseries_df.index.freqstr[:-1])
@@ -1142,7 +1140,6 @@ def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
         #     timeseries_df['Water_LperH_' + str(run)] = additional_profile
 
     if save_to_csv:
-
         # set a name for the file
         save_name = "{}_{}runs_{}L_{}min_{}LperDrawoff.csv".format(
             method, total_runs, mean_drawoff_vol_per_day, int(s_step / 60),
@@ -1160,10 +1157,15 @@ def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
 
 def get_drawoffs(timeseries_df, col_part='Water_LperH'):
 
-    # only get specific columns
-    col_names = list(timeseries_df.columns)
-    cols_LperH = [name for name in col_names if col_part in name]
-    water_LperH_df = timeseries_df[cols_LperH]
+    if col_part != 'all':
+        # only get specific columns
+        col_names = list(timeseries_df.columns)
+        cols_LperH = [name for name in col_names if col_part in name]
+        water_LperH_df = timeseries_df[cols_LperH]
+    else:
+        # the timeseries_df has already been cleaned from unwanted columns
+        water_LperH_df = timeseries_df
+        cols_LperH = list(timeseries_df.columns)
 
     #  generate drawoff Dataframe. initially, it has the same length as the
     #  timeseries_df. Index Column is not the DatetimeIndex anymore, as values
@@ -1172,12 +1174,11 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
                                index=range(len(timeseries_df)))
 
     for col_name in cols_LperH:
-
         #  From each column, get only values > 0.
         drawoffs_series = water_LperH_df[water_LperH_df[col_name] > 0][col_name]
         drawoffs_lst = list(drawoffs_series)
 
-        #  fill values with zeros with NaN's
+        #  fill zero-values with NaN's
         empty_cells_len = len(timeseries_df) - len(drawoffs_lst)
         empty_cells_lst = [np.nan] * empty_cells_len
         drawoffs_lst.extend(empty_cells_lst)
@@ -1194,6 +1195,10 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
 def plot_multiple_runs(timeseries_df, plot_demands_overlay=False,
                        start_plot='2019-02-01', end_plot='2019-02-02',
                        plot_hist=True, plot_kde=True):
+    """
+    this function should only be used when the 'add_additional_runs' function
+    has been used before.
+    """
 
     drawoffs_df, water_LperH_df = get_drawoffs(timeseries_df=timeseries_df)
 
@@ -1222,6 +1227,59 @@ def plot_multiple_runs(timeseries_df, plot_demands_overlay=False,
     if plot_kde:
         ax = sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5,
                          fill=False, linewidth=0.5, legend=False)
+        plt.show()
+
+
+def plot_multiple_timeseries(timeseries_lst, col_part='Water_LperH',
+                             plot_demands_overlay=True,
+                             start_plot='2019-02-01', end_plot='2019-02-02',
+                             plot_hist=True, plot_kde=True):
+    """
+    only use with DHWcalc Timeseries tested.
+    """
+
+    plot_index = timeseries_lst[0].index
+    plot_df = pd.DataFrame(index=plot_index)
+
+    for i, df in enumerate(timeseries_lst):
+
+        # get colum names
+        cols_LperH = [name for name in list(df.columns) if col_part in name]
+
+        # the timeseries_df should only have 1 column that matches the
+        # desired string. more are not implemented yet
+        assert len(cols_LperH) <= 1
+
+        # fill the plot dataframe with the matching column
+        plot_df[i] = df[cols_LperH]
+
+    drawoffs_df, _ = get_drawoffs(timeseries_df=plot_df, col_part='all')
+
+    if plot_demands_overlay:
+        fig, ax1 = plt.subplots()
+        fig.tight_layout()
+
+        ax1 = sns.lineplot(ax=ax1, data=plot_df[start_plot:end_plot],
+                           linewidth=0.5, legend=True)
+
+        # set beautiful x axis ticks for datetime
+        # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax1.xaxis.set_major_locator(locator)
+        ax1.xaxis.set_major_formatter(formatter)
+
+        plt.show()
+
+    if plot_hist:
+        ax = sns.histplot(data=drawoffs_df, kde=True, element="step",
+                          fill=False, stat='count', line_kws={'alpha': 0.8,
+                                                              'linewidth': 0.9})
+        plt.show()
+
+    if plot_kde:
+        ax = sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5,
+                         fill=False, linewidth=0.5, legend=True)
         plt.show()
 
 
@@ -1265,7 +1323,7 @@ def get_s_step(timeseries_df):
 
         steps = len(timeseries_df)
         secs_in_year = 8760 * 60 * 60
-        s_step = secs_in_year/steps
+        s_step = secs_in_year / steps
 
         # check if s_step has no decimal points (should not be 60.01 f.e.)
         assert s_step % 1 == 0
