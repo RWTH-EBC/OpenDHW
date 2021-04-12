@@ -50,21 +50,12 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
     :return:
     """
 
-    # compute Stats for first series
+    # compute Stats for the title
     drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
         'Water_LperH']
-    yearly_water_demand_1 = timeseries_df_1['Water_L'].sum()
-    max_water_flow_1 = timeseries_df_1['Water_LperH'].max()
-    s_step_1 = timeseries_df_1.index.freqstr
-    method_1 = timeseries_df_1['method'][0]
 
-    # compute Stats for second series
     drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
         'Water_LperH']
-    yearly_water_demand_2 = timeseries_df_2['Water_L'].sum()
-    max_water_flow_2 = timeseries_df_2['Water_LperH'].max()
-    s_step_2 = timeseries_df_2.index.freqstr
-    method_2 = timeseries_df_2['method'][0]
 
     if plot_date_slice:
 
@@ -75,25 +66,21 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         fig, (ax1, ax2) = plt.subplots(2, 1)
         fig.tight_layout()
 
+        # First Subplot
         ax1 = sns.lineplot(ax=ax1, data=plot_df_1[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-        ax1.set_title(
-            'Water time-series from {}, timestep = {}\n Yearly Demand ='
-            '{:.2f} L, Peak = {:.2f} L/h, No. Drawoffs = {}'.format(
-                method_1, s_step_1, yearly_water_demand_1,
-                max_water_flow_1, len(drawoffs_1)))
+        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+        ax1.set_title(title_str_1)
 
         ax1.legend(loc="upper left")
 
+        # Second Subplot
         ax2 = sns.lineplot(ax=ax2, data=plot_df_2[start_plot:end_plot],
                            linewidth=1.0, palette=[rwth_blue, rwth_red])
 
-        ax2.set_title(
-            'Water time-series from {}, timestep = {}\n Yearly Water '
-            '{:.2f} L, Peak = {:.2f} L/h, No. Drawoffs = {}'.format(
-                method_2, s_step_2, yearly_water_demand_2,
-                max_water_flow_2, len(drawoffs_2)))
+        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+        ax2.set_title(title_str_2)
 
         ax2.legend(loc="upper left")
 
@@ -134,25 +121,21 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         ax1 = sns.histplot(ax=ax1, data=drawoffs_1, kde=True)
         ax2 = sns.histplot(ax=ax2, data=drawoffs_2, kde=True)
 
-        ax1.set_title('Jensen Shannon Distance = {:.4f} \n Water time-series '
-                      'from {}, timestep = {}, Yearly Demand = {:.2f} L, '
-                      '\n No. Drawoffs = {}, Mean = {:.2f} L/h, Standard '
-                      'Deviation = {:.2f} L/h'.format(
-            distance, method_1, s_step_1, yearly_water_demand_1,
-            len(drawoffs_1), drawoffs_1.mean(), drawoffs_1.std()))
+        # --- Set titles and Labels ---
+        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+        title_str_1 = 'Jensen Shannon Distance = {:.4f} \n'.format(distance) \
+                      + title_str_1
+        ax1.set_title(title_str_1)
 
         ax1.set_ylabel('Count in a Year')
 
-        ax2.set_title('Water time-series from {}, timestep = {}, Yearly '
-                      'Demand = {:.2f} L, \n No. Drawoffs = {}, Mean = {:.2f}'
-                      'L/h, Standard Deviation = {:.2f} L/h'.format(
-            method_2, s_step_2, yearly_water_demand_2, len(drawoffs_2),
-            drawoffs_2.mean(), drawoffs_2.std()))
+        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+        ax2.set_title(title_str_2)
 
         ax2.set_ylabel('Count in a Year')
         ax2.set_xlabel('Flowrate [L/h]')
 
-        # --- set both aes to the same y limit ---
+        # --- set both axes to the same y limit ---
         ymin1, ymax1 = ax1.get_ylim()
         ymin2, ymax2 = ax2.get_ylim()
 
@@ -182,7 +165,7 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         mean1 = timeseries_df_1['mean_drawoff_flow_rate_LperH'][0]
         sdtdev1 = timeseries_df_1['sdtdev_drawoff_flow_rate_LperH'][0]
         non_zero_min1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
-            'Water_LperH'].min()    # smallest entry that is not 0.
+            'Water_LperH'].min()  # smallest entry that is not 0.
 
         bin_values1 = [non_zero_min1,
                        mean1 - 2 * sdtdev1,
@@ -191,7 +174,7 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
                        mean1 + sdtdev1,
                        mean1 + 2 * sdtdev1,
                        timeseries_df_1['Water_LperH'].max()]
-        bin_values1 = list(set(bin_values1))    # remove double entries
+        bin_values1 = list(set(bin_values1))  # remove double entries
         bin_values1.sort()  # bins have to be sorted
 
         mean2 = timeseries_df_2['mean_drawoff_flow_rate_LperH'][0]
@@ -206,7 +189,7 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
                        mean2 + sdtdev2,
                        mean2 + 2 * sdtdev2,
                        timeseries_df_2['Water_LperH'].max()]
-        bin_values2 = list(set(bin_values2))    # remove double entries
+        bin_values2 = list(set(bin_values2))  # remove double entries
         bin_values2.sort()  # bins have to be sorted
 
         bin_values_lst = [bin_values1, bin_values2]
@@ -231,21 +214,15 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
                     (counts[i] / counts.sum()) * 100)
                 ax.text(bin_x_centers[i], bin_y_centers, bin_label, rotation=0)
 
-        ax1.set_title(
-            'Jensen Shannon Distance = {:.4f} \n Water time-series '
-            'from {}, timestep = {}, Yearly Demand = {:.2f} L, '
-            '\n No. Drawoffs = {}, Mean = {:.2f} L/h, Standard '
-            'Deviation = {:.2f} L/h'.format(
-                distance, method_1, s_step_1, yearly_water_demand_1,
-                len(drawoffs_1), drawoffs_1.mean(), drawoffs_1.std()))
+        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+        title_str_1 = 'Jensen Shannon Distance = {:.4f} \n'.format(distance) \
+                      + title_str_1
+        ax1.set_title(title_str_1)
 
         ax1.set_ylabel('Count in a Year')
 
-        ax2.set_title('Water time-series from {}, timestep = {}, Yearly '
-                      'Demand = {:.2f} L, \n No. Drawoffs = {}, Mean = {:.2f}'
-                      'L/h, Standard Deviation = {:.2f} L/h'.format(
-            method_2, s_step_2, yearly_water_demand_2, len(drawoffs_2),
-            drawoffs_2.mean(), drawoffs_2.std()))
+        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+        ax2.set_title(title_str_2)
 
         ax2.set_ylabel('Count in a Year')
         ax2.set_xlabel('Flowrate [L/h]')
@@ -316,7 +293,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories=1,
     timeseries_df['initial_day'] = 0
     timeseries_df['weekend_weekday_factor'] = 1.2
 
-    mean_vol_per_drawoff = 8    # constant DHWcalc 1 category
+    mean_vol_per_drawoff = 8  # constant DHWcalc 1 category
     timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
 
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
@@ -331,36 +308,27 @@ def import_from_dhwcalc(s_step, daylight_saving, categories=1,
     return timeseries_df
 
 
-def draw_histplot(profile_df):
+def draw_histplot(timeseries_df):
     """
     Takes a DHW profile and plots a histogram with some stats in the title
-
-    :param profile_df:   Dataframe that holds the water timeseries
-    :return:
+    :param timeseries_df:   Dataframe that holds the water timeseries
     """
 
-    yearly_water_demand = profile_df['Water_L'].sum()  # in L
-
     # get non-zero values of the profile
-    drawoffs = profile_df[profile_df['Water_LperH'] > 0]['Water_LperH']
+    drawoffs = timeseries_df[timeseries_df['Water_LperH'] > 0]['Water_LperH']
 
     # plot the distribution
-    # https://seaborn.pydata.org/generated/seaborn.displot.html
-    ax = sns.histplot(drawoffs, kde=True,
-                      # palette=[rwth_blue, rwth_red]
-                      )
+    # https://seaborn.pydata.org/generated/seaborn.kdeplot.html
+    ax = sns.kdeplot(data=drawoffs, alpha=.25, bw_adjust=0.05,
+                     color='r')
 
-    # ax2 = ax.twinx()
-    # sns.kdeplot(ax=ax2, data=drawoffs, alpha=.25, bw_adjust=0.05)
+    # https://seaborn.pydata.org/generated/seaborn.histplot.html
+    ax2 = ax.twinx()
+    sns.histplot(data=drawoffs, ax=ax2, stat='count', kde=True)
 
-    # compute seconds in a timestep
-    s_step = profile_df.index.freqstr
-
-    ax.set_title('Timestep = {}, Yearly Demand = {:.1f} L, \n No. Drawoffs = '
-                 '{}, Mean = {:.2f} L/h, Standard Deviation = {:.2f} '
-                 'L/h'.format(
-        s_step, yearly_water_demand, len(drawoffs), drawoffs.mean(),
-        drawoffs.std()), fontdict={'fontsize': 10})
+    # title
+    title_str = make_title_str(timeseries_df=timeseries_df)
+    ax.set_title(title_str)
 
     plt.show()
 
@@ -404,8 +372,6 @@ def draw_detailed_histplot(profile_df, bins=(240, 360, 480, 600, 720, 1200)):
 
     # Display the graph
     plt.show()
-
-    return ax
 
 
 def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
@@ -527,8 +493,6 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
 
     # make dataframe
     timeseries_df = pd.DataFrame(index=date_range)
-
-
 
     # deterministic
     p_norm_integral = generate_yearly_probability_profile(
@@ -1119,9 +1083,8 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
 
         ax1.legend(loc="upper left")
 
-        plt.title('Water Time-series from {}, timestep = {}\n'
-                  'Yearly Water Demand = {:.1f} L with a Peak of {:.2f} L/h'.format(
-            method, s_step, yearly_water_demand, max_water_flow))
+        title_str = make_title_str(timeseries_df=timeseries_df)
+        ax1.set_title(title_str)
 
     if plot_var == 'heat':
         # make dataframe for plotting with seaborn
@@ -1140,11 +1103,6 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
     # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/date_concise_formatter.html
     locator = mdates.AutoDateLocator()
     formatter = mdates.ConciseDateFormatter(locator)
-    formatter.formats = ['%y', '%b', '%d', '%H:%M', '%H:%M', '%S.%f', ]
-    formatter.zero_formats = [''] + formatter.formats[:-1]
-    formatter.zero_formats[3] = '%d-%b'
-    formatter.offset_formats = ['', '%Y', '%b %Y', '%d %b %Y', '%d %b %Y',
-                                '%d %b %Y %H:%M', ]
     ax1.xaxis.set_major_locator(locator)
     ax1.xaxis.set_major_formatter(formatter)
 
@@ -1219,7 +1177,6 @@ def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
 
 
 def get_drawoffs(timeseries_df, col_part='Water_LperH'):
-
     if col_part != 'all':
         # only get specific columns
         col_names = list(timeseries_df.columns)
@@ -1305,7 +1262,6 @@ def plot_multiple_timeseries(timeseries_lst, col_part='Water_LperH',
     plot_df = pd.DataFrame(index=plot_index)
 
     for i, df in enumerate(timeseries_lst):
-
         # get colum names
         cols_LperH = [name for name in list(df.columns) if col_part in name]
 
@@ -1393,3 +1349,36 @@ def get_s_step(timeseries_df):
         s_step = int(s_step)
 
     return s_step
+
+
+def make_title_str(timeseries_df):
+    """
+    creates a title string based on the timerseries dataframe. The title
+    string can then be used for a variety of plots.
+    """
+
+    # compute additional stats for title
+    s_step = timeseries_df.index.freqstr
+    yearly_water_demand = timeseries_df['Water_L'].sum()  # in L
+    drawoffs = timeseries_df[timeseries_df['Water_LperH'] > 0]['Water_LperH']
+    max_water_flow = timeseries_df['Water_LperH'].max()
+
+    method = timeseries_df['method'][0]
+
+    if method == 'DHWcalc':
+        cats = timeseries_df['categories'][0]
+        if cats == 1:
+            method = "{} ({} category)".format(method, cats)
+        elif cats == 4:
+            method = "{} ({} categories)".format(method, cats)
+
+    title_str = '{} , Timestep = {}, Yearly Demand = {:.1f} L ' \
+                '\n No. Drawoffs = {}, Peak = {:.1f} L/h, Mean = {:.1f} L/h, ' \
+                'SdtDev = {:.1f} L/h'.format(
+        method, s_step, yearly_water_demand, len(drawoffs), max_water_flow,
+        drawoffs.mean(), drawoffs.std())
+
+    return title_str
+
+
+
