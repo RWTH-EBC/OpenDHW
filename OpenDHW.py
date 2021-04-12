@@ -178,15 +178,45 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
 
         drawoffs_lst = [drawoffs_1, drawoffs_2]
 
-        bin_values = [240, 360, 480, 600, 720, 1200]
-        # todo: dont hardcode bins!
+        # create bin values
+        mean1 = timeseries_df_1['mean_drawoff_flow_rate_LperH'][0]
+        sdtdev1 = timeseries_df_1['sdtdev_drawoff_flow_rate_LperH'][0]
+        non_zero_min1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
+            'Water_LperH'].min()    # smallest entry that is not 0.
+
+        bin_values1 = [non_zero_min1,
+                       mean1 - 2 * sdtdev1,
+                       mean1 - sdtdev1,
+                       mean1,
+                       mean1 + sdtdev1,
+                       mean1 + 2 * sdtdev1,
+                       timeseries_df_1['Water_LperH'].max()]
+        bin_values1 = list(set(bin_values1))    # remove double entries
+        bin_values1.sort()  # bins have to be sorted
+
+        mean2 = timeseries_df_2['mean_drawoff_flow_rate_LperH'][0]
+        sdtdev2 = timeseries_df_2['sdtdev_drawoff_flow_rate_LperH'][0]
+        non_zero_min2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
+            'Water_LperH'].min()  # smallest entry that is not 0.
+
+        bin_values2 = [non_zero_min2,
+                       mean2 - 2 * sdtdev2,
+                       mean2 - sdtdev2,
+                       mean2,
+                       mean2 + sdtdev2,
+                       mean2 + 2 * sdtdev2,
+                       timeseries_df_2['Water_LperH'].max()]
+        bin_values2 = list(set(bin_values2))    # remove double entries
+        bin_values2.sort()  # bins have to be sorted
+
+        bin_values_lst = [bin_values1, bin_values2]
 
         for sub_i, drawoffs_i in enumerate(drawoffs_lst):
 
             ax = axes[sub_i]
 
-            counts, bins, patches = ax.hist(drawoffs_i, bins=bin_values,
-                                            edgecolor='black')
+            counts, bins, patches = ax.hist(
+                drawoffs_i, bins=bin_values_lst[sub_i], edgecolor='black')
 
             # Set the ticks to be at the edges of the bins.
             ax.set_xticks(bins.round(2))
@@ -281,11 +311,22 @@ def import_from_dhwcalc(s_step, daylight_saving, categories=1,
     timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
     timeseries_df['method'] = 'DHWcalc'
     timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
-    timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day / 4
+    timeseries_df['sdtdev_drawoff_vol_per_day'] = mean_drawoff_vol_per_day / 4
     timeseries_df['categories'] = categories
     timeseries_df['initial_day'] = 0
     timeseries_df['weekend_weekday_factor'] = 1.2
-    timeseries_df['mean_vol_per_drawoff'] = 8
+
+    mean_vol_per_drawoff = 8    # constant DHWcalc 1 category
+    timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
+
+    av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
+    timeseries_df['mean_drawoff_flow_rate_LperH'] = av_drawoff_flow_rate
+
+    sdt_dev_drawoff_flow_rate = av_drawoff_flow_rate / 4  # in L/h
+    timeseries_df['sdtdev_drawoff_flow_rate_LperH'] = sdt_dev_drawoff_flow_rate
+
+    mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
+    timeseries_df['mean_no_drawoffs_per_day'] = mean_no_drawoffs_per_day
 
     return timeseries_df
 
@@ -479,6 +520,16 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
     :return:
     """
 
+    # make empty dataframe
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
+
+    # make dataframe
+    timeseries_df = pd.DataFrame(index=date_range)
+
+
+
     # deterministic
     p_norm_integral = generate_yearly_probability_profile(
         s_step=s_step,
@@ -486,7 +537,8 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
         initial_day=0
     )
 
-    drawoffs, p_drawoffs = generate_drawoffs(
+    timeseries_df, drawoffs, p_drawoffs = generate_drawoffs(
+        timeseries_df=timeseries_df,
         method=drawoff_method,
         mean_vol_per_drawoff=mean_vol_per_drawoff,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
@@ -495,6 +547,7 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
     )
 
     timeseries_df = distribute_drawoffs(
+        timeseries_df=timeseries_df,
         drawoffs=drawoffs,
         p_drawoffs=p_drawoffs,
         p_norm_integral=p_norm_integral,
@@ -597,7 +650,8 @@ def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
     return p_final
 
 
-def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
+def distribute_drawoffs(timeseries_df, drawoffs, p_drawoffs, p_norm_integral,
+                        s_step):
     """
     Takes a small list (p_drawoffs) and sorts it into a bigger list (
     p_norm_integral). Both lists are being sorted. Then, the big list is
@@ -605,6 +659,7 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
     value of the big list, the index of the big list is saved and a drawoff
     event from the drawoffs list occurs.
 
+    :param timeseries_df:   df:     holds the timeseries
     :param drawoffs:        list:   drawoff events in L/h
     :param p_drawoffs:      list:   drawoff event probabilities [0...1]
     :param p_norm_integral: list:   normalized sum of yearly water use
@@ -631,21 +686,15 @@ def distribute_drawoffs(drawoffs, p_drawoffs, p_norm_integral, s_step):
             if drawoff_count >= len(drawoffs):
                 break
 
-    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
-                               freq=str(s_step) + 'S')
-    date_range = date_range[:-1]
-
-    # make dataframe
-    timeseries_df = pd.DataFrame(water_LperH, index=date_range, columns=[
-        'Water_LperH'])
-
+    timeseries_df['Water_LperH'] = water_LperH
     timeseries_df['Water_LperSec'] = timeseries_df['Water_LperH'] / 3600
     timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
 
     return timeseries_df
 
 
-def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
+def generate_drawoffs(timeseries_df, s_step, p_norm_integral,
+                      mean_vol_per_drawoff=8,
                       mean_drawoff_vol_per_day=200, method='gauss_combined'):
     """
     Generates two lists. First, the "drawoffs" list, with the darwoff events as
@@ -661,6 +710,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     Then, the drawoff list are generated following either a Gauss
     Distribution (as describesd in the DHWcalc paper) or a beta distribution.
 
+    :param timeseries_df:               df:     holds the timeseries
     :param s_step:                      int     seconds within a timestep
     :param p_norm_integral:             list    min and max values taken
     :param mean_vol_per_drawoff:        int     mean volume per drawpff
@@ -671,8 +721,6 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
     """
     # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
 
-    # Todo: checken warum total drawoffs in DHWcalc anders ist
-
     av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
 
     sdt_dev_drawoff_flow_rate = av_drawoff_flow_rate / 4  # in L/h
@@ -681,7 +729,22 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
     total_drawoffs = int(mean_no_drawoffs_per_day * 365)
 
-    max_drawoff_flow_rate = 1200  # in L/h
+    timeseries_df['mean_drawoff_flow_rate_LperH'] = av_drawoff_flow_rate
+    timeseries_df['sdtdev_drawoff_flow_rate_LperH'] = sdt_dev_drawoff_flow_rate
+    timeseries_df['mean_no_drawoffs_per_day'] = mean_no_drawoffs_per_day
+
+    # todo: dont hardcode this!
+    if s_step <= 60:
+        max_drawoff_flow_rate = 1200  # in L/h
+    elif s_step <= 360:
+        max_drawoff_flow_rate = 660  # in L/h
+    elif s_step <= 600:
+        max_drawoff_flow_rate = 414  # in L/h
+    elif s_step <= 900:
+        max_drawoff_flow_rate = 327  # in L/h
+    else:
+        max_drawoff_flow_rate = 250  # in L/h
+
     min_drawoff_flow_rate = 6  # in L/h
 
     if method == 'gauss_combined':
@@ -728,12 +791,12 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
         # DHWcalc has a set flow rate step rather than a continuous
         # distribution. Thus, we round the drawoff distribution according to
         # this step width.
-        flow_rate_step = 6  # L/h
+        if s_step == 60:
+            flow_rate_step = 6  # L/h # todo: looks like this a function of s_step!
+        else:
+            flow_rate_step = 1
         drawoffs = [flow_rate_step * round(i / flow_rate_step) for i in
                     drawoffs]
-
-        # sns.displot(drawoffs, kde=True)
-        # plt.show()
 
     elif method == 'beta':
         # https://en.wikipedia.org/wiki/Beta_distribution
@@ -847,7 +910,7 @@ def generate_drawoffs(s_step, p_norm_integral, mean_vol_per_drawoff=8,
 
     p_drawoffs = [random.uniform(min_rand, max_rand) for i in drawoffs]
 
-    return drawoffs, p_drawoffs
+    return timeseries_df, drawoffs, p_drawoffs
 
 
 def normalize_and_sum_list(lst):

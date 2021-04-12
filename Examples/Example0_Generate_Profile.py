@@ -5,10 +5,10 @@ import OpenDHW
 This Example generates an OpenDHW Timeseries.
 
 Like DHWcalc, OpenDHW need a parametrisation. The usual parametrisation for 
-households is 40 L/(person*day). So a 5 person single family house has a mean
+households is 40 L/(person*day). Thus, a 5 person single family house has a mean
 drawoff volume of 200 L/day.
 
-A multi family house with 10 flat, and 5 people per flat thus has a mean 
+A multi family house with 10 flats, and 5 people per flat thus has a mean 
 drawoff rate of 2000 L/day.
 
 For non-residental buildings, the daily probability functions should be 
