@@ -1,0 +1,8 @@
+Naming Scheme for the DHWcalc files. So the python function 'import_from_dhwcalc' choses the correct file.
+
+200L		200 Liters per day are drawn off
+1min		the timestep is 1min (60seconds)
+1/4cat		DHWcalc settings if 1 or 4 categories are used to generate Drawoffs
+Sf		DHWcalc setting that step function are used for the daily probabilities
+Ds/nods		daylight saving or no daylight saving applied
+Max1200		the maximum flow rate is 1200 L/h.
