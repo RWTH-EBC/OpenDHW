@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 import xlrd
 import math
 import statistics
 import random
-import matplotlib.dates as mdates
 import OpenDHW
 
 # pycity base has to be installed
@@ -213,9 +210,9 @@ def generate_dhw_profile_average_profile(s_step, weekend_weekday_factor=1.2,
         s_step=s_step
     )
 
-    p_final = OpenDHW.normalize_list_to_max(lst=p_final)
+    p_final = normalize_list_to_max(lst=p_final)
 
-    water_LperH = OpenDHW.distribute_average_profile(
+    water_LperH = distribute_average_profile(
         average_profile=average_profile,
         p_final=p_final,
         s_step=s_step
@@ -338,3 +335,69 @@ def distribute_average_profile(average_profile, s_step, p_final):
             water_LperH.append(0)
 
     return water_LperH
+
+
+def normalize_list_to_max(lst):
+    """
+    takes a list and normalizes it based on the max of all list elements.
+
+    :param lst:                 list:   input list
+    :return: lst_norm_integral: list    output list
+    """
+
+    max_lst = max(lst)
+    lst_norm = [float(element) / max_lst for element in lst]
+
+    return lst_norm
+
+
+def plot_average_profiles_pycity(save_fig=False):
+    profiles_path = Path.cwd() / 'dhw_stochastical.xlsx'
+    profiles = {"we": {}, "wd": {}}
+    book = xlrd.open_workbook(profiles_path)
+
+    s_step = 600
+
+    # Iterate over all sheets. wd = weekday, we = weekend. mw = ist the
+    # average profile in [L/h] in 10min steps. occupancy is between 1-6 (we1 -
+    # we6).
+    for sheetname in book.sheet_names():
+        sheet = book.sheet_by_name(sheetname)
+
+        # Read values
+        values = [sheet.cell_value(i, 0) for i in range(1440)]
+
+        # Store values in dictionary
+        if sheetname in ("wd_mw", "we_mw"):
+            profiles[sheetname] = values  # minute-wise average profile L/h
+
+    water_LperH_we = profiles["we_mw"]
+    water_LperH_wd = profiles["wd_mw"]
+
+    water_L_we = [i * s_step / 3600 for i in water_LperH_we]
+    water_L_wd = [i * s_step / 3600 for i in water_LperH_wd]
+
+    daily_water_we = round(sum(water_L_we), 1)
+    daily_water_wd = round(sum(water_L_wd), 1)
+
+    av_wd_lst = [statistics.mean(water_LperH_we) for i in range(1440)]
+    av_we_lst = [statistics.mean(water_LperH_wd) for i in range(1440)]
+
+    fig, ax = plt.subplots()
+    ax.plot(water_LperH_we, linewidth=0.7, label="Weekend")
+    ax.plot(water_LperH_wd, linewidth=0.7, label="Weekday")
+    ax.plot(av_wd_lst, linewidth=0.7, label="Average Weekday")
+    ax.plot(av_we_lst, linewidth=0.7, label="Average Weekday")
+    plt.ylabel('Water [L/h]')
+    plt.xlabel('Minutes in a day')
+    plt.title('Average profiles from PyCity. \n'
+              'Daily Sum Weekday: {} L, Daily Sum Weekend: {} L'.format(
+        daily_water_wd, daily_water_we))
+
+    plt.legend(loc='upper left')
+    plt.show()
+
+    if save_fig:
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+        fig.savefig(dir_output / "Average_Profiles_PyCity.pdf")

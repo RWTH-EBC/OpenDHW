@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-import xlrd
 import math
 import statistics
 import random
@@ -30,215 +29,6 @@ sns.set_context("paper")
 # --- Constants ---
 rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
 cp = 4180  # J/kgK
-
-
-def compare_generators(timeseries_df_1, timeseries_df_2,
-                       start_plot='2019-03-01', end_plot='2019-03-08',
-                       plot_date_slice=True, plot_distribution=True,
-                       plot_detailed_distribution=True, save_fig=False):
-    """
-    Compares two methods of computing the water flow time series by means of
-    a subplot.
-    :param timeseries_df_1:     list:   first water flow time series
-    :param timeseries_df_2:     list:   second water flow time series
-    :param start_plot:          string: date, f.e. 2019-03-01
-    :param end_plot:            string: date, f.e. 2019-03-08
-    :param plot_date_slice
-    :param plot_distribution
-    :param plot_detailed_distribution
-    :param save_fig:            bool:   decide to save the plot
-    :return:
-    """
-
-    # compute Stats for the title
-    drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
-        'Water_LperH']
-
-    drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
-        'Water_LperH']
-
-    if plot_date_slice:
-
-        # make dataframe for plotting with seaborn
-        plot_df_1 = timeseries_df_1[['Water_LperH', 'mean_drawoff_vol_per_day']]
-        plot_df_2 = timeseries_df_2[['Water_LperH', 'mean_drawoff_vol_per_day']]
-
-        fig, (ax1, ax2) = plt.subplots(2, 1)
-        fig.tight_layout()
-
-        # First Subplot
-        ax1 = sns.lineplot(ax=ax1, data=plot_df_1[start_plot:end_plot],
-                           linewidth=1.0, palette=[rwth_blue, rwth_red])
-
-        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
-        ax1.set_title(title_str_1)
-
-        ax1.legend(loc="upper left")
-
-        # Second Subplot
-        ax2 = sns.lineplot(ax=ax2, data=plot_df_2[start_plot:end_plot],
-                           linewidth=1.0, palette=[rwth_blue, rwth_red])
-
-        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
-        ax2.set_title(title_str_2)
-
-        ax2.legend(loc="upper left")
-
-        # --- set both aes to the same y limit ---
-        ymin1, ymax1 = ax1.get_ylim()
-        ymin2, ymax2 = ax2.get_ylim()
-
-        ymax_set = max(ymax1, ymax2)
-
-        ax1.set_ylim(ymin1, ymax_set)
-        ax2.set_ylim(ymin2, ymax_set)
-
-        # --- beautiful x-ticks ---
-        locator = mdates.AutoDateLocator()
-        formatter = mdates.ConciseDateFormatter(locator)
-        ax1.xaxis.set_major_locator(locator)
-        ax1.xaxis.set_major_formatter(formatter)
-        ax2.xaxis.set_major_locator(locator)
-        ax2.xaxis.set_major_formatter(formatter)
-
-        plt.show()
-
-        if save_fig:
-            dir_output = Path.cwd() / "plots"
-            dir_output.mkdir(exist_ok=True)
-            fig.savefig(dir_output / "Demand_Comparision.pdf")
-
-    if plot_distribution:
-        # compute Jensen Shannon Distance
-        distance = jensen_shannon_distance(q=timeseries_df_1['Water_LperH'],
-                                           p=timeseries_df_2['Water_LperH'])
-
-        fig, (ax1, ax2) = plt.subplots(2, 1)
-        fig.tight_layout()
-
-        # plot the distribution
-        # https://seaborn.pydata.org/generated/seaborn.displot.html
-        ax1 = sns.histplot(ax=ax1, data=drawoffs_1, kde=True)
-        ax2 = sns.histplot(ax=ax2, data=drawoffs_2, kde=True)
-
-        # --- Set titles and Labels ---
-        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
-        title_str_1 = 'Jensen Shannon Distance = {:.4f} \n'.format(distance) \
-                      + title_str_1
-        ax1.set_title(title_str_1)
-
-        ax1.set_ylabel('Count in a Year')
-
-        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
-        ax2.set_title(title_str_2)
-
-        ax2.set_ylabel('Count in a Year')
-        ax2.set_xlabel('Flowrate [L/h]')
-
-        # --- set both axes to the same y limit ---
-        ymin1, ymax1 = ax1.get_ylim()
-        ymin2, ymax2 = ax2.get_ylim()
-
-        ymax_set = max(ymax1, ymax2)
-
-        ax1.set_ylim(ymin1, ymax_set)
-        ax2.set_ylim(ymin2, ymax_set)
-
-        plt.show()
-
-    if plot_detailed_distribution:
-
-        # https://towardsdatascience.com/advanced-histogram-using-python-bceae288e715
-
-        # compute Jensen Shannon Distance
-        distance = jensen_shannon_distance(q=timeseries_df_1['Water_LperH'],
-                                           p=timeseries_df_2['Water_LperH'])
-
-        fig, axes = plt.subplots(2, 1)
-        ax1 = axes[0]
-        ax2 = axes[1]
-        fig.tight_layout()
-
-        drawoffs_lst = [drawoffs_1, drawoffs_2]
-
-        # create bin values
-        mean1 = timeseries_df_1['mean_drawoff_flow_rate_LperH'][0]
-        sdtdev1 = timeseries_df_1['sdtdev_drawoff_flow_rate_LperH'][0]
-        non_zero_min1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
-            'Water_LperH'].min()  # smallest entry that is not 0.
-
-        bin_values1 = [non_zero_min1,
-                       mean1 - 2 * sdtdev1,
-                       mean1 - sdtdev1,
-                       mean1,
-                       mean1 + sdtdev1,
-                       mean1 + 2 * sdtdev1,
-                       timeseries_df_1['Water_LperH'].max()]
-        bin_values1 = list(set(bin_values1))  # remove double entries
-        bin_values1.sort()  # bins have to be sorted
-
-        mean2 = timeseries_df_2['mean_drawoff_flow_rate_LperH'][0]
-        sdtdev2 = timeseries_df_2['sdtdev_drawoff_flow_rate_LperH'][0]
-        non_zero_min2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
-            'Water_LperH'].min()  # smallest entry that is not 0.
-
-        bin_values2 = [non_zero_min2,
-                       mean2 - 2 * sdtdev2,
-                       mean2 - sdtdev2,
-                       mean2,
-                       mean2 + sdtdev2,
-                       mean2 + 2 * sdtdev2,
-                       timeseries_df_2['Water_LperH'].max()]
-        bin_values2 = list(set(bin_values2))  # remove double entries
-        bin_values2.sort()  # bins have to be sorted
-
-        bin_values_lst = [bin_values1, bin_values2]
-
-        for sub_i, drawoffs_i in enumerate(drawoffs_lst):
-
-            ax = axes[sub_i]
-
-            counts, bins, patches = ax.hist(
-                drawoffs_i, bins=bin_values_lst[sub_i], edgecolor='black')
-
-            # Set the ticks to be at the edges of the bins.
-            ax.set_xticks(bins.round(2))
-
-            # Calculate bar centre to display the count of data points and %
-            bin_x_centers = 0.1 * np.diff(bins) + bins[:-1]
-            bin_y_centers = ax.get_yticks()[1] * 0.25
-
-            # Display the the count of data points and % for each bar in hist
-            for i in range(len(bins) - 1):
-                bin_label = str(int(counts[i])) + "\n{0:.2f}%".format(
-                    (counts[i] / counts.sum()) * 100)
-                ax.text(bin_x_centers[i], bin_y_centers, bin_label, rotation=0)
-
-        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
-        title_str_1 = 'Jensen Shannon Distance = {:.4f} \n'.format(distance) \
-                      + title_str_1
-        ax1.set_title(title_str_1)
-
-        ax1.set_ylabel('Count in a Year')
-
-        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
-        ax2.set_title(title_str_2)
-
-        ax2.set_ylabel('Count in a Year')
-        ax2.set_xlabel('Flowrate [L/h]')
-
-        # --- set both aes to the same y limit ---
-        ymin1, ymax1 = ax1.get_ylim()
-        ymin2, ymax2 = ax2.get_ylim()
-
-        ymax_set = max(ymax1, ymax2)
-
-        ax1.set_ylim(ymin1, ymax_set)
-        ax2.set_ylim(ymin2, ymax_set)
-
-        plt.show()
-
-    return
 
 
 def import_from_dhwcalc(s_step, daylight_saving, categories=1,
@@ -306,153 +96,6 @@ def import_from_dhwcalc(s_step, daylight_saving, categories=1,
     timeseries_df['mean_no_drawoffs_per_day'] = mean_no_drawoffs_per_day
 
     return timeseries_df
-
-
-def draw_histplot(timeseries_df):
-    """
-    Takes a DHW profile and plots a histogram with some stats in the title
-    :param timeseries_df:   Dataframe that holds the water timeseries
-    """
-
-    # get non-zero values of the profile
-    drawoffs = timeseries_df[timeseries_df['Water_LperH'] > 0]['Water_LperH']
-
-    # plot the distribution
-    # https://seaborn.pydata.org/generated/seaborn.kdeplot.html
-    ax = sns.kdeplot(data=drawoffs, alpha=.25, bw_adjust=0.05,
-                     color='r')
-
-    # https://seaborn.pydata.org/generated/seaborn.histplot.html
-    ax2 = ax.twinx()
-    sns.histplot(data=drawoffs, ax=ax2, stat='count', kde=True)
-
-    # title
-    title_str = make_title_str(timeseries_df=timeseries_df)
-    ax.set_title(title_str)
-
-    plt.show()
-
-
-def draw_detailed_histplot(profile_df, bins=(240, 360, 480, 600, 720, 1200)):
-    """
-    https://towardsdatascience.com/advanced-histogram-using-python-bceae288e715
-
-    counts  = numpy.ndarray of count of data ponts for each bin/column in the histogram
-    bins    = numpy.ndarray of bin edge/range values
-    patches = a list of Patch objects.
-            each Patch object contains a Rectangle object.
-            e.g. Rectangle(xy=(-2.51953, 0), width=0.501013, height=3, angle=0)
-    """
-
-    # get non-zero values of the profile
-    drawoffs = profile_df[profile_df['Water_LperH'] > 0]['Water_LperH']
-
-    # Plot the Histogram from the random data
-    fig, (ax) = plt.subplots()
-
-    counts, bins, patches = ax.hist(drawoffs, bins=bins, edgecolor='black')
-
-    # Set the ticks to be at the edges of the bins.
-    ax.set_xticks(bins.round(2))
-
-    # Set the graph title and axes titles
-    plt.ylabel('Count')
-    plt.xlabel('Flowrate L/h')
-
-    # Calculate bar centre to display the count of data points and %
-    bin_x_centers = 0.5 * np.diff(bins) + bins[:-1]
-    bin_y_centers = ax.get_yticks()[1] * 0.25
-
-    # Display the the count of data points and % for each bar in histogram
-    for i in range(len(bins) - 1):
-        bin_label = "{0:,}".format(counts[i]) + "  ({0:.2f}%)".format(
-            (counts[i] / counts.sum()) * 100)
-        plt.text(bin_x_centers[i], bin_y_centers, bin_label, rotation=90,
-                 rotation_mode='anchor')
-
-    # Display the graph
-    plt.show()
-
-
-def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
-    """
-    Shifts the probabilities between the weekday list and the weekend list by a
-    defined factor. If the factor is bigger than 1, the probability on the
-    weekend is increased. If its smaller than 1, the probability on the
-    weekend is decreased.
-
-    :param p_weekday:   list:   probabilites for 1 day of the week [0...1]
-    :param p_weekend:   list:   probabilitiers for 1 day of the weekend [0...1]
-    :param factor:      float:  factor to shift the probabiliters between
-                                weekdays and weekenddays
-    :return:
-    """
-
-    av_p_wd = statistics.mean(p_weekday)
-    av_p_we = statistics.mean(p_weekend)
-
-    av_p_week = av_p_wd * 5 / 7 + av_p_we * 2 / 7
-
-    p_wd_factor = 1 / (5 / 7 + factor * 2 / 7)
-    p_we_factor = 1 / (1 / factor * 5 / 7 + 2 / 7)
-
-    assert p_wd_factor * 5 / 7 + p_we_factor * 2 / 7 == 1
-
-    p_wd_weighted = [p * p_we_factor for p in p_weekday]
-    p_we_weighted = [p * p_we_factor for p in p_weekend]
-
-    av_p_wd_weighted = statistics.mean(p_wd_weighted)
-    av_p_we_weighted = statistics.mean(p_we_weighted)
-
-    av_p_week_weighted = av_p_wd_weighted * 5 / 7 + av_p_we_weighted * 2 / 7
-
-    return p_wd_weighted, p_we_weighted, av_p_week_weighted
-
-
-def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
-                                        initial_day=0):
-    """
-    generate a summed yearly probabilty profile. The whole function is
-    deterministc. The same inputs always produce the same outputs.
-
-    1)  Probabilities for weekdays and weekend-days are loaded (p_we, p_wd).
-    2)  Probability of weekend-days is increased relative to weekdays (shift).
-    3)  Based on an initial day, the yearly probability distribution (p_final)
-        is generated. The seasonal influence is modelled by a sine-function.
-    4)  p_final is normalized and integrated. The sum over the year is thus
-        equal to 1 (p_norm_integral).
-
-    """
-
-    # load daily probabilities (deterministic)
-    p_we = generate_daily_probability_step_function(
-        mode='weekend',
-        s_step=s_step
-    )
-
-    p_wd = generate_daily_probability_step_function(
-        mode='weekday',
-        s_step=s_step
-    )
-
-    # shift towards weekend (deterministic)
-    p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
-        p_weekday=p_wd,
-        p_weekend=p_we,
-        factor=weekend_weekday_factor
-    )
-
-    # yearly curve (deterministic)
-    p_final = generate_yearly_probabilities(
-        initial_day=initial_day,
-        p_weekend=p_we_weighted,
-        p_weekday=p_wd_weighted,
-        s_step=s_step
-    )
-
-    p_norm_integral = normalize_and_sum_list(lst=p_final)
-
-    return p_norm_integral
 
 
 def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
@@ -630,52 +273,136 @@ def generate_dhw_profile_4cats(s_step, weekend_weekday_factor=1.2,
     return timeseries_df
 
 
-def generate_dhw_profile_from_drawoffs(s_step, drawoffs,
-                                       weekend_weekday_factor=1.2,
-                                       drawoff_method='gauss_combined',
-                                       mean_vol_per_drawoff=8,
-                                       mean_drawoff_vol_per_day=200,
-                                       initial_day=0):
+def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
     """
-    Generates a DHW profile. The generation is split up in different
-    functions and generally follows the methodology described in the DHWcalc
-    paper from Uni Kassel.
+    Generates probabilities for a day with 6 periods. Corresponds to the mode
+    "step function for weekdays and weekends" in DHWcalc and uses the same
+    standard values. Each Day starts at 0:00. Steps in hours. Sum of steps
+    has to be 24. Sum of probabilites has to be 1.
 
-    :param s_step:
-    :param drawoffs:
-    :param weekend_weekday_factor:
-    :param drawoff_method:
-    :param mean_vol_per_drawoff:
-    :param mean_drawoff_vol_per_day:
-    :param initial_day:
-    :return:
+    :param mode:        string: decide to compute for a weekday of a weekend day
+    :param s_step:      int:    seconds within a timestep
+    :param plot_p_day:  Bool:   decide to plot the probability distribution
+    :return: p_day      list:   the probability distribution for one day.
     """
 
-    p_norm_integral = generate_yearly_probability_profile(
-        s_step=s_step,
-        weekend_weekday_factor=1.2,
-        initial_day=0
-    )
+    # todo: add profiles for non-residential buildings
 
-    min_rand = min(p_norm_integral)
-    max_rand = max(p_norm_integral)
-    p_drawoffs = [random.uniform(min_rand, max_rand) for i in drawoffs]
+    if mode == 'weekday':
 
-    timeseries_df = distribute_drawoffs(
-        drawoffs=drawoffs,
-        p_drawoffs=p_drawoffs,
-        p_norm_integral=p_norm_integral,
+        steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
+                        (5, 0.06), (4, 0.2), (2, 0.01)]
+
+    elif mode == 'weekend':
+
+        steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
+                        (3, 0.036), (3, 0.143), (1, 0.018)]
+
+    else:
+        raise Exception('Unkown Mode. Please Choose "Weekday" or "Weekend".')
+
+    steps = [tup[0] for tup in steps_and_ps]
+    ps = [tup[1] for tup in steps_and_ps]
+
+    assert sum(steps) == 24
+    assert sum(ps) == 1
+
+    p_day = []
+
+    for tup in steps_and_ps:
+        p_lst = [tup[1] for i in range(int(tup[0] * 3600 / s_step))]
+        p_day.extend(p_lst)
+
+    # check if length of daily intervals fits into the stepwidth. if s_step
+    # f.e is 3600s (1h), one daily intervall cant be 4.5 hours.
+    assert len(p_day) == 24 * 3600 / s_step
+
+    if plot_p_day:
+        plt.plot(p_day)
+        plt.show()
+
+    return p_day
+
+
+def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
+                                        initial_day=0):
+    """
+    generate a summed yearly probabilty profile. The whole function is
+    deterministc. The same inputs always produce the same outputs.
+
+    1)  Probabilities for weekdays and weekend-days are loaded (p_we, p_wd).
+    2)  Probability of weekend-days is increased relative to weekdays (shift).
+    3)  Based on an initial day, the yearly probability distribution (p_final)
+        is generated. The seasonal influence is modelled by a sine-function.
+    4)  p_final is normalized and integrated. The sum over the year is thus
+        equal to 1 (p_norm_integral).
+
+    """
+
+    # load daily probabilities (deterministic)
+    p_we = generate_daily_probability_step_function(
+        mode='weekend',
         s_step=s_step
     )
 
-    timeseries_df['method'] = 'OpenDHW'
-    timeseries_df['drawoff_method'] = drawoff_method
-    timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
-    timeseries_df['initial_day'] = initial_day
-    timeseries_df['weekend_weekday_factor'] = weekend_weekday_factor
-    timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
+    p_wd = generate_daily_probability_step_function(
+        mode='weekday',
+        s_step=s_step
+    )
 
-    return timeseries_df
+    # shift towards weekend (deterministic)
+    p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
+        p_weekday=p_wd,
+        p_weekend=p_we,
+        factor=weekend_weekday_factor
+    )
+
+    # yearly curve (deterministic)
+    p_final = generate_yearly_probabilities(
+        initial_day=initial_day,
+        p_weekend=p_we_weighted,
+        p_weekday=p_wd_weighted,
+        s_step=s_step
+    )
+
+    p_norm_integral = normalize_and_sum_list(lst=p_final)
+
+    return p_norm_integral
+
+
+def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
+    """
+    Shifts the probabilities between the weekday list and the weekend list by a
+    defined factor. If the factor is bigger than 1, the probability on the
+    weekend is increased. If its smaller than 1, the probability on the
+    weekend is decreased.
+
+    :param p_weekday:   list:   probabilites for 1 day of the week [0...1]
+    :param p_weekend:   list:   probabilitiers for 1 day of the weekend [0...1]
+    :param factor:      float:  factor to shift the probabiliters between
+                                weekdays and weekenddays
+    :return:
+    """
+
+    av_p_wd = statistics.mean(p_weekday)
+    av_p_we = statistics.mean(p_weekend)
+
+    av_p_week = av_p_wd * 5 / 7 + av_p_we * 2 / 7
+
+    p_wd_factor = 1 / (5 / 7 + factor * 2 / 7)
+    p_we_factor = 1 / (1 / factor * 5 / 7 + 2 / 7)
+
+    assert p_wd_factor * 5 / 7 + p_we_factor * 2 / 7 == 1
+
+    p_wd_weighted = [p * p_we_factor for p in p_weekday]
+    p_we_weighted = [p * p_we_factor for p in p_weekend]
+
+    av_p_wd_weighted = statistics.mean(p_wd_weighted)
+    av_p_we_weighted = statistics.mean(p_we_weighted)
+
+    av_p_week_weighted = av_p_wd_weighted * 5 / 7 + av_p_we_weighted * 2 / 7
+
+    return p_wd_weighted, p_we_weighted, av_p_week_weighted
 
 
 def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
@@ -715,88 +442,26 @@ def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
     return p_final
 
 
-def distribute_drawoffs_cats(timeseries_df, cat, drawoffs, p_drawoffs,
-                             p_norm_integral, s_step):
+def normalize_and_sum_list(lst):
     """
-    Takes a small list (p_drawoffs) and sorts it into a bigger list (
-    p_norm_integral). Both lists are being sorted. Then, the big list is
-    iterated over, and whenever a value of the small list is smaller than a
-    value of the big list, the index of the big list is saved and a drawoff
-    event from the drawoffs list occurs.
+    takes a list and normalizes it based on the sum of all list elements.
+    then generates a new list based on the current sum of each list entry.
 
-    :param timeseries_df:   df:     holds the timeseries
-    :param drawoffs:        list:   drawoff events in L/h
-    :param p_drawoffs:      list:   drawoff event probabilities [0...1]
-    :param p_norm_integral: list:   normalized sum of yearly water use
-                                    probabilities [0...1]
-    :param s_step:          int:    seconds within a timestep
-
-    :return: water_LperH:   list:   resutling water drawoff profile
+    :param lst:                 list:   input list
+    :return: lst_norm_integral: list    output list
     """
 
-    p_drawoffs.sort()
-    p_norm_integral.sort()
+    sum_lst = sum(lst)
+    lst_norm = [float(i) / sum_lst for i in lst]
 
-    drawoff_count = 0
+    current_sum = 0
+    lst_norm_integral = []
 
-    # for return statement
-    water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+    for entry in lst_norm:
+        current_sum += entry
+        lst_norm_integral.append(current_sum)
 
-    for step, p_current_sum in enumerate(p_norm_integral):
-
-        if p_drawoffs[drawoff_count] < p_current_sum:
-            water_LperH[step] = drawoffs[drawoff_count]
-            drawoff_count += 1
-
-            if drawoff_count >= len(drawoffs):
-                break
-
-    timeseries_df['Water_LperH_cat{}'.format(cat)] = water_LperH
-
-    return timeseries_df
-
-
-def distribute_drawoffs(timeseries_df, drawoffs, p_drawoffs, p_norm_integral,
-                        s_step):
-    """
-    Takes a small list (p_drawoffs) and sorts it into a bigger list (
-    p_norm_integral). Both lists are being sorted. Then, the big list is
-    iterated over, and whenever a value of the small list is smaller than a
-    value of the big list, the index of the big list is saved and a drawoff
-    event from the drawoffs list occurs.
-
-    :param timeseries_df:   df:     holds the timeseries
-    :param drawoffs:        list:   drawoff events in L/h
-    :param p_drawoffs:      list:   drawoff event probabilities [0...1]
-    :param p_norm_integral: list:   normalized sum of yearly water use
-                                    probabilities [0...1]
-    :param s_step:          int:    seconds within a timestep
-
-    :return: water_LperH:   list:   resutling water drawoff profile
-    """
-
-    p_drawoffs.sort()
-    p_norm_integral.sort()
-
-    drawoff_count = 0
-
-    # for return statement
-    water_LperH = [0] * int(365 * 24 * 3600 / s_step)
-
-    for step, p_current_sum in enumerate(p_norm_integral):
-
-        if p_drawoffs[drawoff_count] < p_current_sum:
-            water_LperH[step] = drawoffs[drawoff_count]
-            drawoff_count += 1
-
-            if drawoff_count >= len(drawoffs):
-                break
-
-    timeseries_df['Water_LperH'] = water_LperH
-    timeseries_df['Water_LperSec'] = timeseries_df['Water_LperH'] / 3600
-    timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
-
-    return timeseries_df
+    return lst_norm_integral
 
 
 def generate_drawoffs_cats(timeseries_df, cat, s_step, p_norm_integral,
@@ -1087,143 +752,88 @@ def generate_drawoffs(timeseries_df, s_step, p_norm_integral,
     return timeseries_df, drawoffs, p_drawoffs
 
 
-def normalize_and_sum_list(lst):
+def distribute_drawoffs_cats(timeseries_df, cat, drawoffs, p_drawoffs,
+                             p_norm_integral, s_step):
     """
-    takes a list and normalizes it based on the sum of all list elements.
-    then generates a new list based on the current sum of each list entry.
+    Takes a small list (p_drawoffs) and sorts it into a bigger list (
+    p_norm_integral). Both lists are being sorted. Then, the big list is
+    iterated over, and whenever a value of the small list is smaller than a
+    value of the big list, the index of the big list is saved and a drawoff
+    event from the drawoffs list occurs.
 
-    :param lst:                 list:   input list
-    :return: lst_norm_integral: list    output list
-    """
+    :param timeseries_df:   df:     holds the timeseries
+    :param drawoffs:        list:   drawoff events in L/h
+    :param p_drawoffs:      list:   drawoff event probabilities [0...1]
+    :param p_norm_integral: list:   normalized sum of yearly water use
+                                    probabilities [0...1]
+    :param s_step:          int:    seconds within a timestep
 
-    sum_lst = sum(lst)
-    lst_norm = [float(i) / sum_lst for i in lst]
-
-    current_sum = 0
-    lst_norm_integral = []
-
-    for entry in lst_norm:
-        current_sum += entry
-        lst_norm_integral.append(current_sum)
-
-    return lst_norm_integral
-
-
-def normalize_list_to_max(lst):
-    """
-    takes a list and normalizes it based on the max of all list elements.
-
-    :param lst:                 list:   input list
-    :return: lst_norm_integral: list    output list
+    :return: water_LperH:   list:   resutling water drawoff profile
     """
 
-    max_lst = max(lst)
-    lst_norm = [float(element) / max_lst for element in lst]
+    p_drawoffs.sort()
+    p_norm_integral.sort()
 
-    return lst_norm
+    drawoff_count = 0
+
+    # for return statement
+    water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+
+    for step, p_current_sum in enumerate(p_norm_integral):
+
+        if p_drawoffs[drawoff_count] < p_current_sum:
+            water_LperH[step] = drawoffs[drawoff_count]
+            drawoff_count += 1
+
+            if drawoff_count >= len(drawoffs):
+                break
+
+    timeseries_df['Water_LperH_cat{}'.format(cat)] = water_LperH
+
+    return timeseries_df
 
 
-def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
+def distribute_drawoffs(timeseries_df, drawoffs, p_drawoffs, p_norm_integral,
+                        s_step):
     """
-    Generates probabilities for a day with 6 periods. Corresponds to the mode
-    "step function for weekdays and weekends" in DHWcalc and uses the same
-    standard values. Each Day starts at 0:00. Steps in hours. Sum of steps
-    has to be 24. Sum of probabilites has to be 1.
+    Takes a small list (p_drawoffs) and sorts it into a bigger list (
+    p_norm_integral). Both lists are being sorted. Then, the big list is
+    iterated over, and whenever a value of the small list is smaller than a
+    value of the big list, the index of the big list is saved and a drawoff
+    event from the drawoffs list occurs.
 
-    :param mode:        string: decide to compute for a weekday of a weekend day
-    :param s_step:      int:    seconds within a timestep
-    :param plot_p_day:  Bool:   decide to plot the probability distribution
-    :return: p_day      list:   the probability distribution for one day.
+    :param timeseries_df:   df:     holds the timeseries
+    :param drawoffs:        list:   drawoff events in L/h
+    :param p_drawoffs:      list:   drawoff event probabilities [0...1]
+    :param p_norm_integral: list:   normalized sum of yearly water use
+                                    probabilities [0...1]
+    :param s_step:          int:    seconds within a timestep
+
+    :return: water_LperH:   list:   resutling water drawoff profile
     """
 
-    # todo: add profiles for non-residential buildings
+    p_drawoffs.sort()
+    p_norm_integral.sort()
 
-    if mode == 'weekday':
+    drawoff_count = 0
 
-        steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
-                        (5, 0.06), (4, 0.2), (2, 0.01)]
+    # for return statement
+    water_LperH = [0] * int(365 * 24 * 3600 / s_step)
 
-    elif mode == 'weekend':
+    for step, p_current_sum in enumerate(p_norm_integral):
 
-        steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
-                        (3, 0.036), (3, 0.143), (1, 0.018)]
+        if p_drawoffs[drawoff_count] < p_current_sum:
+            water_LperH[step] = drawoffs[drawoff_count]
+            drawoff_count += 1
 
-    else:
-        raise Exception('Unkown Mode. Please Choose "Weekday" or "Weekend".')
+            if drawoff_count >= len(drawoffs):
+                break
 
-    steps = [tup[0] for tup in steps_and_ps]
-    ps = [tup[1] for tup in steps_and_ps]
+    timeseries_df['Water_LperH'] = water_LperH
+    timeseries_df['Water_LperSec'] = timeseries_df['Water_LperH'] / 3600
+    timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
 
-    assert sum(steps) == 24
-    assert sum(ps) == 1
-
-    p_day = []
-
-    for tup in steps_and_ps:
-        p_lst = [tup[1] for i in range(int(tup[0] * 3600 / s_step))]
-        p_day.extend(p_lst)
-
-    # check if length of daily intervals fits into the stepwidth. if s_step
-    # f.e is 3600s (1h), one daily intervall cant be 4.5 hours.
-    assert len(p_day) == 24 * 3600 / s_step
-
-    if plot_p_day:
-        plt.plot(p_day)
-        plt.show()
-
-    return p_day
-
-
-def plot_average_profiles_pycity(save_fig=False):
-    profiles_path = Path.cwd() / 'dhw_stochastical.xlsx'
-    profiles = {"we": {}, "wd": {}}
-    book = xlrd.open_workbook(profiles_path)
-
-    s_step = 600
-
-    # Iterate over all sheets. wd = weekday, we = weekend. mw = ist the
-    # average profile in [L/h] in 10min steps. occupancy is between 1-6 (we1 -
-    # we6).
-    for sheetname in book.sheet_names():
-        sheet = book.sheet_by_name(sheetname)
-
-        # Read values
-        values = [sheet.cell_value(i, 0) for i in range(1440)]
-
-        # Store values in dictionary
-        if sheetname in ("wd_mw", "we_mw"):
-            profiles[sheetname] = values  # minute-wise average profile L/h
-
-    water_LperH_we = profiles["we_mw"]
-    water_LperH_wd = profiles["wd_mw"]
-
-    water_L_we = [i * s_step / 3600 for i in water_LperH_we]
-    water_L_wd = [i * s_step / 3600 for i in water_LperH_wd]
-
-    daily_water_we = round(sum(water_L_we), 1)
-    daily_water_wd = round(sum(water_L_wd), 1)
-
-    av_wd_lst = [statistics.mean(water_LperH_we) for i in range(1440)]
-    av_we_lst = [statistics.mean(water_LperH_wd) for i in range(1440)]
-
-    fig, ax = plt.subplots()
-    ax.plot(water_LperH_we, linewidth=0.7, label="Weekend")
-    ax.plot(water_LperH_wd, linewidth=0.7, label="Weekday")
-    ax.plot(av_wd_lst, linewidth=0.7, label="Average Weekday")
-    ax.plot(av_we_lst, linewidth=0.7, label="Average Weekday")
-    plt.ylabel('Water [L/h]')
-    plt.xlabel('Minutes in a day')
-    plt.title('Average profiles from PyCity. \n'
-              'Daily Sum Weekday: {} L, Daily Sum Weekend: {} L'.format(
-        daily_water_wd, daily_water_we))
-
-    plt.legend(loc='upper left')
-    plt.show()
-
-    if save_fig:
-        dir_output = Path.cwd() / "plots"
-        dir_output.mkdir(exist_ok=True)
-        fig.savefig(dir_output / "Average_Profiles_PyCity.pdf")
+    return timeseries_df
 
 
 def compute_heat(timeseries_df, temp_dT=35):
@@ -1324,6 +934,72 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
         fig.savefig(dir_output / "Demand_{}_sliced.pdf".format(method))
 
     return fig
+
+
+def draw_histplot(timeseries_df):
+    """
+    Takes a DHW profile and plots a histogram with some stats in the title
+    :param timeseries_df:   Dataframe that holds the water timeseries
+    """
+
+    # get non-zero values of the profile
+    drawoffs = timeseries_df[timeseries_df['Water_LperH'] > 0]['Water_LperH']
+
+    # plot the distribution
+    # https://seaborn.pydata.org/generated/seaborn.kdeplot.html
+    ax = sns.kdeplot(data=drawoffs, alpha=.25, bw_adjust=0.05,
+                     color='r')
+
+    # https://seaborn.pydata.org/generated/seaborn.histplot.html
+    ax2 = ax.twinx()
+    sns.histplot(data=drawoffs, ax=ax2, stat='count', kde=True)
+
+    # title
+    title_str = make_title_str(timeseries_df=timeseries_df)
+    ax.set_title(title_str)
+
+    plt.show()
+
+
+def draw_detailed_histplot(profile_df, bins=(240, 360, 480, 600, 720, 1200)):
+    """
+    https://towardsdatascience.com/advanced-histogram-using-python-bceae288e715
+
+    counts  = numpy.ndarray of count of data ponts for each bin/column in the histogram
+    bins    = numpy.ndarray of bin edge/range values
+    patches = a list of Patch objects.
+            each Patch object contains a Rectangle object.
+            e.g. Rectangle(xy=(-2.51953, 0), width=0.501013, height=3, angle=0)
+    """
+
+    # get non-zero values of the profile
+    drawoffs = profile_df[profile_df['Water_LperH'] > 0]['Water_LperH']
+
+    # Plot the Histogram from the random data
+    fig, (ax) = plt.subplots()
+
+    counts, bins, patches = ax.hist(drawoffs, bins=bins, edgecolor='black')
+
+    # Set the ticks to be at the edges of the bins.
+    ax.set_xticks(bins.round(2))
+
+    # Set the graph title and axes titles
+    plt.ylabel('Count')
+    plt.xlabel('Flowrate L/h')
+
+    # Calculate bar centre to display the count of data points and %
+    bin_x_centers = 0.5 * np.diff(bins) + bins[:-1]
+    bin_y_centers = ax.get_yticks()[1] * 0.25
+
+    # Display the the count of data points and % for each bar in histogram
+    for i in range(len(bins) - 1):
+        bin_label = "{0:,}".format(counts[i]) + "  ({0:.2f}%)".format(
+            (counts[i] / counts.sum()) * 100)
+        plt.text(bin_x_centers[i], bin_y_centers, bin_label, rotation=90,
+                 rotation_mode='anchor')
+
+    # Display the graph
+    plt.show()
 
 
 def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
@@ -1510,6 +1186,215 @@ def plot_multiple_timeseries(timeseries_lst, col_part='Water_LperH',
         ax = sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5,
                          fill=False, linewidth=0.5, legend=True)
         plt.show()
+
+
+def compare_generators(timeseries_df_1, timeseries_df_2,
+                       start_plot='2019-03-01', end_plot='2019-03-08',
+                       plot_date_slice=True, plot_distribution=True,
+                       plot_detailed_distribution=True, save_fig=False):
+    """
+    Compares two methods of computing the water flow time series by means of
+    a subplot.
+    :param timeseries_df_1:     list:   first water flow time series
+    :param timeseries_df_2:     list:   second water flow time series
+    :param start_plot:          string: date, f.e. 2019-03-01
+    :param end_plot:            string: date, f.e. 2019-03-08
+    :param plot_date_slice
+    :param plot_distribution
+    :param plot_detailed_distribution
+    :param save_fig:            bool:   decide to save the plot
+    :return:
+    """
+
+    # compute Stats for the title
+    drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
+        'Water_LperH']
+
+    drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
+        'Water_LperH']
+
+    if plot_date_slice:
+
+        # make dataframe for plotting with seaborn
+        plot_df_1 = timeseries_df_1[['Water_LperH', 'mean_drawoff_vol_per_day']]
+        plot_df_2 = timeseries_df_2[['Water_LperH', 'mean_drawoff_vol_per_day']]
+
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        fig.tight_layout()
+
+        # First Subplot
+        ax1 = sns.lineplot(ax=ax1, data=plot_df_1[start_plot:end_plot],
+                           linewidth=1.0, palette=[rwth_blue, rwth_red])
+
+        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+        ax1.set_title(title_str_1)
+
+        ax1.legend(loc="upper left")
+
+        # Second Subplot
+        ax2 = sns.lineplot(ax=ax2, data=plot_df_2[start_plot:end_plot],
+                           linewidth=1.0, palette=[rwth_blue, rwth_red])
+
+        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+        ax2.set_title(title_str_2)
+
+        ax2.legend(loc="upper left")
+
+        # --- set both aes to the same y limit ---
+        ymin1, ymax1 = ax1.get_ylim()
+        ymin2, ymax2 = ax2.get_ylim()
+
+        ymax_set = max(ymax1, ymax2)
+
+        ax1.set_ylim(ymin1, ymax_set)
+        ax2.set_ylim(ymin2, ymax_set)
+
+        # --- beautiful x-ticks ---
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax1.xaxis.set_major_locator(locator)
+        ax1.xaxis.set_major_formatter(formatter)
+        ax2.xaxis.set_major_locator(locator)
+        ax2.xaxis.set_major_formatter(formatter)
+
+        plt.show()
+
+        if save_fig:
+            dir_output = Path.cwd() / "plots"
+            dir_output.mkdir(exist_ok=True)
+            fig.savefig(dir_output / "Demand_Comparision.pdf")
+
+    if plot_distribution:
+        # compute Jensen Shannon Distance
+        distance = jensen_shannon_distance(q=timeseries_df_1['Water_LperH'],
+                                           p=timeseries_df_2['Water_LperH'])
+
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        fig.tight_layout()
+
+        # plot the distribution
+        # https://seaborn.pydata.org/generated/seaborn.displot.html
+        ax1 = sns.histplot(ax=ax1, data=drawoffs_1, kde=True)
+        ax2 = sns.histplot(ax=ax2, data=drawoffs_2, kde=True)
+
+        # --- Set titles and Labels ---
+        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+        title_str_1 = 'Jensen Shannon Distance = {:.4f} \n'.format(distance) \
+                      + title_str_1
+        ax1.set_title(title_str_1)
+
+        ax1.set_ylabel('Count in a Year')
+
+        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+        ax2.set_title(title_str_2)
+
+        ax2.set_ylabel('Count in a Year')
+        ax2.set_xlabel('Flowrate [L/h]')
+
+        # --- set both axes to the same y limit ---
+        ymin1, ymax1 = ax1.get_ylim()
+        ymin2, ymax2 = ax2.get_ylim()
+
+        ymax_set = max(ymax1, ymax2)
+
+        ax1.set_ylim(ymin1, ymax_set)
+        ax2.set_ylim(ymin2, ymax_set)
+
+        plt.show()
+
+    if plot_detailed_distribution:
+
+        # https://towardsdatascience.com/advanced-histogram-using-python-bceae288e715
+
+        # compute Jensen Shannon Distance
+        distance = jensen_shannon_distance(q=timeseries_df_1['Water_LperH'],
+                                           p=timeseries_df_2['Water_LperH'])
+
+        fig, axes = plt.subplots(2, 1)
+        ax1 = axes[0]
+        ax2 = axes[1]
+        fig.tight_layout()
+
+        drawoffs_lst = [drawoffs_1, drawoffs_2]
+
+        # create bin values
+        mean1 = timeseries_df_1['mean_drawoff_flow_rate_LperH'][0]
+        sdtdev1 = timeseries_df_1['sdtdev_drawoff_flow_rate_LperH'][0]
+        non_zero_min1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
+            'Water_LperH'].min()  # smallest entry that is not 0.
+
+        bin_values1 = [non_zero_min1,
+                       mean1 - 2 * sdtdev1,
+                       mean1 - sdtdev1,
+                       mean1,
+                       mean1 + sdtdev1,
+                       mean1 + 2 * sdtdev1,
+                       timeseries_df_1['Water_LperH'].max()]
+        bin_values1 = list(set(bin_values1))  # remove double entries
+        bin_values1.sort()  # bins have to be sorted
+
+        mean2 = timeseries_df_2['mean_drawoff_flow_rate_LperH'][0]
+        sdtdev2 = timeseries_df_2['sdtdev_drawoff_flow_rate_LperH'][0]
+        non_zero_min2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
+            'Water_LperH'].min()  # smallest entry that is not 0.
+
+        bin_values2 = [non_zero_min2,
+                       mean2 - 2 * sdtdev2,
+                       mean2 - sdtdev2,
+                       mean2,
+                       mean2 + sdtdev2,
+                       mean2 + 2 * sdtdev2,
+                       timeseries_df_2['Water_LperH'].max()]
+        bin_values2 = list(set(bin_values2))  # remove double entries
+        bin_values2.sort()  # bins have to be sorted
+
+        bin_values_lst = [bin_values1, bin_values2]
+
+        for sub_i, drawoffs_i in enumerate(drawoffs_lst):
+
+            ax = axes[sub_i]
+
+            counts, bins, patches = ax.hist(
+                drawoffs_i, bins=bin_values_lst[sub_i], edgecolor='black')
+
+            # Set the ticks to be at the edges of the bins.
+            ax.set_xticks(bins.round(2))
+
+            # Calculate bar centre to display the count of data points and %
+            bin_x_centers = 0.1 * np.diff(bins) + bins[:-1]
+            bin_y_centers = ax.get_yticks()[1] * 0.25
+
+            # Display the the count of data points and % for each bar in hist
+            for i in range(len(bins) - 1):
+                bin_label = str(int(counts[i])) + "\n{0:.2f}%".format(
+                    (counts[i] / counts.sum()) * 100)
+                ax.text(bin_x_centers[i], bin_y_centers, bin_label, rotation=0)
+
+        title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+        title_str_1 = 'Jensen Shannon Distance = {:.4f} \n'.format(distance) \
+                      + title_str_1
+        ax1.set_title(title_str_1)
+
+        ax1.set_ylabel('Count in a Year')
+
+        title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+        ax2.set_title(title_str_2)
+
+        ax2.set_ylabel('Count in a Year')
+        ax2.set_xlabel('Flowrate [L/h]')
+
+        # --- set both aes to the same y limit ---
+        ymin1, ymax1 = ax1.get_ylim()
+        ymin2, ymax2 = ax2.get_ylim()
+
+        ymax_set = max(ymax1, ymax2)
+
+        ax1.set_ylim(ymin1, ymax_set)
+        ax2.set_ylim(ymin2, ymax_set)
+
+        plt.show()
+
+    return
 
 
 def jensen_shannon_distance(p, q):
