@@ -32,30 +32,14 @@ mean_drawoff_vol_per_day = mean_drawoff_vol_per_day_and_person * people
 def main():
 
     # generate time-series with OpenDHW
-    timeseries_df = OpenDHW.generate_dhw_profile(
+    timeseries_df = OpenDHW.generate_dhw_profile_4cats(
         s_step=s_step,
-        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
-
-    # Compute Heat from Water TimeSeries
-    timeseries_df = OpenDHW.compute_heat(
-        timeseries_df=timeseries_df,
-        temp_dT=35
-    )
-
-    # example timeseries which could be fed into Dymola
-    water_series = timeseries_df['Water_L']
-    heat_series = timeseries_df['Heat_kWh']
 
     # Generate Histogram from the loaded timeseries
     OpenDHW.draw_histplot(timeseries_df=timeseries_df)
 
-    # Generate Lineplot from the loaded timeseries
-    OpenDHW.draw_lineplot(timeseries_df=timeseries_df, start_plot=start_plot,
-                          end_plot=end_plot)
-
-    # Generate detailed Histogram from the loaded timeseries
-    OpenDHW.draw_detailed_histplot(profile_df=timeseries_df)
+    pass
 
 
 if __name__ == '__main__':

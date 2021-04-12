@@ -413,7 +413,7 @@ def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
                                         initial_day=0):
     """
     generate a summed yearly probabilty profile. The whole function is
-    determiinstc. The same inputs always produce the same outputs.
+    deterministc. The same inputs always produce the same outputs.
 
     1)  Probabilities for weekdays and weekend-days are loaded (p_we, p_wd).
     2)  Probability of weekend-days is increased relative to weekdays (shift).
@@ -529,6 +529,107 @@ def generate_dhw_profile(s_step, weekend_weekday_factor=1.2,
     return timeseries_df
 
 
+def generate_dhw_profile_4cats(s_step, weekend_weekday_factor=1.2,
+                               initial_day=0):
+    """
+    Generates a DHW profile. The generation is split up in different
+    functions and generally follows the methodology described in the DHWcalc
+    paper from Uni Kassel.
+
+    1)  Probabilities for weekdays and weekend-days are loaded (p_day).
+    2)  Probability of weekend-days is increased relative to weekdays (shift).
+    3)  Based on an initial day, the yearly probability distribution (p_final)
+        is generated. The seasonal influence is modelled by a sine-function.
+    4)  p_final is normalized and integrated. The sum over the year is thus
+        equal to 1 (p_norm_integral).
+    5)  Drawoffs are generated based on a Beta distribution. Additionally,
+        a list of random values bwtween 0 and 1 is generated.
+    6)  The drawoffs are distributed based on the random values into the
+        p_norm_integral space. The final yearly drawoff profile is returned.
+    7)  Optionally, the profile can be plotted and the associated heat
+        computed.
+
+    4 categories standard values from DHWcalc:
+
+                                        cat 1   cat2    cat3    cat4    sum
+    mean flow rate per drawoff [L/h]    60      360     720     480
+    drawoff duration [min]              1       1       10      5
+    portion [%]                         14%     36%     10%     40%     100%
+    sdt-dev [L/h]                       120     120     12      24
+
+    mean vol per drawoff [L]            1       6       120     40
+    mean no. drawoffs per day [-]       28      12      0.166   2
+    mean vol per day [L]                28      72      20      80      200
+
+    :param s_step:
+    :param weekend_weekday_factor:
+    :param initial_day:
+    :return:
+    """
+
+    cats_data = {'mean_flow_rate_per_drawoff_LperH': [60, 360, 720, 480],
+                 'drawoff_duration_min': [1, 1, 10, 5],
+                 'portion': [0.14, 0.36, 0.1, 0.4],
+                 'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12, 24],
+                 'mean_vol_per_drawoff': [1, 6, 120, 40],
+                 'mean_no_drawoffs_per_day': [28, 12, 0.166, 2],
+                 'mean_vol_per_day': [28, 72, 20, 80]
+                 }
+
+    cats_df = pd.DataFrame(cats_data, index=['cat1', 'cat2', 'cat3', 'cat4'])
+
+    # make empty dataframe
+    date_range = pd.date_range(start='2019-01-01', end='2020-01-01',
+                               freq=str(s_step) + 'S')
+    date_range = date_range[:-1]
+
+    # make dataframe
+    timeseries_df = pd.DataFrame(index=date_range)
+
+    # deterministic
+    p_norm_integral = generate_yearly_probability_profile(
+        s_step=s_step,
+        weekend_weekday_factor=1.2,
+        initial_day=0
+    )
+
+    for i, cat in enumerate(cats_df.index, start=1):
+
+        timeseries_df, drawoffs1, p_drawoffs1 = generate_drawoffs_cats(
+            timeseries_df=timeseries_df,
+            cat=i,
+            mean_vol_per_drawoff=cats_df.at[cat, 'mean_vol_per_drawoff'],
+            mean_drawoff_vol_per_day=cats_df.at[cat, 'mean_vol_per_day'],
+            s_step=s_step,
+            p_norm_integral=p_norm_integral
+        )
+
+        timeseries_df = distribute_drawoffs_cats(
+            timeseries_df=timeseries_df,
+            cat=i,
+            drawoffs=drawoffs1,
+            p_drawoffs=p_drawoffs1,
+            p_norm_integral=p_norm_integral,
+            s_step=s_step
+        )
+
+    col_names = list(timeseries_df.columns)
+    cols_LperH = [name for name in col_names if 'Water_LperH' in name]
+    water_LperH_df = timeseries_df[cols_LperH]
+    timeseries_df['Water_LperH'] = water_LperH_df.sum(axis=1)
+
+    timeseries_df['Water_LperSec'] = timeseries_df['Water_LperH'] / 3600
+    timeseries_df['Water_L'] = timeseries_df['Water_LperSec'] * s_step
+
+    timeseries_df['method'] = 'OpenDHW'
+    timeseries_df['categories'] = len(cats_df.index)
+    timeseries_df['drawoff_method'] = 'gauss_categories'
+    timeseries_df['initial_day'] = initial_day
+    timeseries_df['weekend_weekday_factor'] = weekend_weekday_factor
+
+    return timeseries_df
+
+
 def generate_dhw_profile_from_drawoffs(s_step, drawoffs,
                                        weekend_weekday_factor=1.2,
                                        drawoff_method='gauss_combined',
@@ -614,6 +715,47 @@ def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
     return p_final
 
 
+def distribute_drawoffs_cats(timeseries_df, cat, drawoffs, p_drawoffs,
+                             p_norm_integral, s_step):
+    """
+    Takes a small list (p_drawoffs) and sorts it into a bigger list (
+    p_norm_integral). Both lists are being sorted. Then, the big list is
+    iterated over, and whenever a value of the small list is smaller than a
+    value of the big list, the index of the big list is saved and a drawoff
+    event from the drawoffs list occurs.
+
+    :param timeseries_df:   df:     holds the timeseries
+    :param drawoffs:        list:   drawoff events in L/h
+    :param p_drawoffs:      list:   drawoff event probabilities [0...1]
+    :param p_norm_integral: list:   normalized sum of yearly water use
+                                    probabilities [0...1]
+    :param s_step:          int:    seconds within a timestep
+
+    :return: water_LperH:   list:   resutling water drawoff profile
+    """
+
+    p_drawoffs.sort()
+    p_norm_integral.sort()
+
+    drawoff_count = 0
+
+    # for return statement
+    water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+
+    for step, p_current_sum in enumerate(p_norm_integral):
+
+        if p_drawoffs[drawoff_count] < p_current_sum:
+            water_LperH[step] = drawoffs[drawoff_count]
+            drawoff_count += 1
+
+            if drawoff_count >= len(drawoffs):
+                break
+
+    timeseries_df['Water_LperH_cat{}'.format(cat)] = water_LperH
+
+    return timeseries_df
+
+
 def distribute_drawoffs(timeseries_df, drawoffs, p_drawoffs, p_norm_integral,
                         s_step):
     """
@@ -657,9 +799,77 @@ def distribute_drawoffs(timeseries_df, drawoffs, p_drawoffs, p_norm_integral,
     return timeseries_df
 
 
+def generate_drawoffs_cats(timeseries_df, cat, s_step, p_norm_integral,
+                           mean_vol_per_drawoff=8,
+                           mean_drawoff_vol_per_day=200):
+    """
+    Generates two lists. First, the "drawoffs" list, with the darwoff events as
+    flowrate entries in Liter/hour.  Second, the "p_drawoffs" list, which has
+    the same length as the "drawoffs" lists but contains random values,
+    between the minimum and the maximum of "p_norm_integral". These are
+    usually values between 0 and 1, following the convention of DHWcalc.
+
+    The drawoffs are generated based on some key parameters, like the mean
+    water volume consumed per drawoff and the mean water volume consumed per
+    day.
+
+    Then, the drawoff list are generated following either a Gauss
+    Distribution (as describesd in the DHWcalc paper) or a beta distribution.
+
+    :param timeseries_df:               df:     holds the timeseries
+    :param s_step:                      int     seconds within a timestep
+    :param p_norm_integral:             list    min and max values taken
+    :param mean_vol_per_drawoff:        int     mean volume per drawpff
+    :param mean_drawoff_vol_per_day:    int     mean volume drawn off per day
+    :return:    drawoffs:               list    drawoff events in [L/h]
+                p_drawoffs:             list    probabilities 0...1
+    """
+    # dhw calc has more settings here, see Fig 5 in paper "Draw off features".
+
+    av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
+
+    sdt_dev_drawoff_flow_rate = av_drawoff_flow_rate / 4  # in L/h
+
+    mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
+
+    total_drawoffs = int(mean_no_drawoffs_per_day * 365)
+
+    timeseries_df['mean_drawoff_flow_rate_LperH_cat' + str(cat)] = \
+        av_drawoff_flow_rate
+    timeseries_df['sdtdev_drawoff_flow_rate_LperH_cat' + str(cat)] = \
+        sdt_dev_drawoff_flow_rate
+    timeseries_df['mean_no_drawoffs_per_day_cat' + str(cat)] = \
+        mean_no_drawoffs_per_day
+
+    max_drawoff_flow_rate = 1200  # in L/h
+    min_drawoff_flow_rate = 1  # in L/h
+
+    mu = av_drawoff_flow_rate  # in L/h
+    sig = sdt_dev_drawoff_flow_rate  # in L/h
+
+    drawoffs = [random.gauss(mu, sig) for i in range(total_drawoffs)]
+
+    low_lim = mu - 2 * sig
+    if low_lim < 0 or low_lim > min_drawoff_flow_rate:
+        low_lim = min_drawoff_flow_rate
+
+    up_lim = min(float(mu + 2 * sig), max_drawoff_flow_rate)
+
+    # cut gauss distribution, lowers standard-deviation. keeps Mean.
+    drawoffs_reduced = [i for i in drawoffs if low_lim < i < up_lim]
+    drawoffs = drawoffs_reduced
+
+    min_rand = min(p_norm_integral)
+    max_rand = max(p_norm_integral)
+
+    p_drawoffs = [random.uniform(min_rand, max_rand) for i in drawoffs]
+
+    return timeseries_df, drawoffs, p_drawoffs
+
+
 def generate_drawoffs(timeseries_df, s_step, p_norm_integral,
-                      mean_vol_per_drawoff=8,
-                      mean_drawoff_vol_per_day=200, method='gauss_combined'):
+                      mean_vol_per_drawoff=8, mean_drawoff_vol_per_day=200,
+                      method='gauss_combined'):
     """
     Generates two lists. First, the "drawoffs" list, with the darwoff events as
     flowrate entries in Liter/hour.  Second, the "p_drawoffs" list, which has
@@ -1379,6 +1589,3 @@ def make_title_str(timeseries_df):
         drawoffs.mean(), drawoffs.std())
 
     return title_str
-
-
-
