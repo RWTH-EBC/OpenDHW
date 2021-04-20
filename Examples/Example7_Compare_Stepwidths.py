@@ -7,10 +7,13 @@ from DHWcalc. Then each OpenDHW TimeSeries is compared with the DHWcalc
 Timeseries.
 """
 
-# --- Parameter Section ---
+# --- Parameters ---
 s_steps = [60, 360, 600, 900]
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
+
+# --- Constants ---
+mean_drawoff_vol_per_day = 200
 
 
 def main():
@@ -19,14 +22,19 @@ def main():
 
         # Load time-series from DHWcalc
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
-            s_step=s_step, categories=1, mean_drawoff_vol_per_day=200,
-            daylight_saving=False)
+            s_step=s_step,
+            categories=1,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+            daylight_saving=False
+        )
 
         # generate time-series with OpenDHW
         open_dhw_df = OpenDHW.generate_dhw_profile(
-            s_step=s_step, mean_drawoff_vol_per_day=200)
+            s_step=s_step,
+            mean_vol_per_drawoff=mean_drawoff_vol_per_day,
+        )
 
-        # compare  time-series from DWHcalc and OpenDHW
+        # compare time-series
         OpenDHW.compare_generators(
             timeseries_df_1=dhwcalc_df,
             timeseries_df_2=open_dhw_df,

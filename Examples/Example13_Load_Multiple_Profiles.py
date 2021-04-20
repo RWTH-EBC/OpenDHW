@@ -21,13 +21,12 @@ end_plot = '2019-01-31'
 def main():
 
     # get large run of OpenDHW results from the csv generated in Example 4.
-    timeseries_df = pd.read_csv(save_path, index_col=0, parse_dates=True)
+    timeseries_df_study = pd.read_csv(save_path, index_col=0, parse_dates=True)
 
-    s_step = OpenDHW.get_s_step(timeseries_df=timeseries_df)
+    s_step = OpenDHW.get_s_step(timeseries_df=timeseries_df_study)
 
     # get the Drawoffs (elements that are not Zeros), and compute average
-    drawoffs_df, water_LperH_df = OpenDHW.get_drawoffs(
-        timeseries_df=timeseries_df)
+    drawoffs_df = OpenDHW.get_drawoffs(timeseries_df=timeseries_df_study)
     av_drawoffs = drawoffs_df.mean(axis=1)
     # todo: understand what .mean(axis=1) actually does
 
@@ -40,27 +39,26 @@ def main():
     sum_5 = sum(drawoffs_df.iloc[:, 4].fillna(0))
 
     # distribute that av. list over a year
-    p_norm_integral = OpenDHW.generate_yearly_probability_profile(
+    timeseries_df_av = OpenDHW.generate_yearly_probability_profile(
         s_step=s_step,
         weekend_weekday_factor=1.2,
         initial_day=0
     )
 
-    min_rand = min(p_norm_integral)
-    max_rand = max(p_norm_integral)
-    p_drawoffs = [random.uniform(min_rand, max_rand) for _ in av_drawoffs]
-
     timeseries_df_av = OpenDHW.distribute_drawoffs(
+        timeseries_df=timeseries_df_av,
         drawoffs=av_drawoffs,
-        p_drawoffs=p_drawoffs,
-        p_norm_integral=p_norm_integral,
-        s_step=s_step
     )
 
     # copy some constants from the large-study df to the new av-df
-    timeseries_df_av['method'] = timeseries_df['method']
-    timeseries_df_av['mean_drawoff_vol_per_day'] = timeseries_df[
-        'mean_drawoff_vol_per_day']
+    timeseries_df_av['method'] = timeseries_df_study['method']
+    timeseries_df_av['categories'] = timeseries_df_study['categories']
+    timeseries_df_av['mean_drawoff_vol_per_day'] \
+        = timeseries_df_study['mean_drawoff_vol_per_day']
+    timeseries_df_av['mean_drawoff_flow_rate_LperH'] \
+        = timeseries_df_study['mean_drawoff_flow_rate_LperH']
+    timeseries_df_av['sdtdev_drawoff_flow_rate_LperH'] \
+        = timeseries_df_study['sdtdev_drawoff_flow_rate_LperH']
 
     # Load time-series from DHWcalc
     timeseries_df_dhwcalc = OpenDHW.import_from_dhwcalc(

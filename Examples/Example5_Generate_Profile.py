@@ -2,11 +2,12 @@
 import OpenDHW
 
 """
-This Example generates an OpenDHW Timeseries.
+This Example generates an OpenDHW Timeseries, based on DHWcalc with 1 category.
 
 Like DHWcalc, OpenDHW need a parametrisation. The usual parametrisation for 
 households is 40 L/(person*day). Thus, a 5 person single family house has a mean
-drawoff volume of 200 L/day.
+drawoff volume of 200 L/day. More information can be found in 
+'OpenDHW/Resources_Water_Demand_Parametrisation'.
 
 A multi family house with 10 flats, and 5 people per flat thus has a mean 
 drawoff rate of 2000 L/day.
@@ -17,7 +18,7 @@ and the evening.
 """
 
 # --- Parameter Section ---
-s_step = 60
+s_step = 600
 people = 5
 
 # --- Plot Parameters ---
@@ -33,9 +34,12 @@ def main():
 
     # generate time-series with OpenDHW
     timeseries_df = OpenDHW.generate_dhw_profile(
-        s_step=s_step,
+        s_step=60,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
+
+    timeseries_df = OpenDHW.resample_water_series(
+        timeseries_df=timeseries_df, rule=str(s_step) + 'S')
 
     # Compute Heat from Water TimeSeries
     timeseries_df = OpenDHW.compute_heat(
@@ -55,7 +59,7 @@ def main():
                           end_plot=end_plot)
 
     # Generate detailed Histogram from the loaded timeseries
-    OpenDHW.draw_detailed_histplot(profile_df=timeseries_df)
+    OpenDHW.draw_detailed_histplot(timeseries_df=timeseries_df)
 
 
 if __name__ == '__main__':
