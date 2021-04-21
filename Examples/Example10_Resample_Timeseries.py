@@ -7,13 +7,9 @@ generating a distribution with different initial timesteps. (why?)
 """
 
 # --- Parameters ---
-s_steps = [360, 600, 900]
-start_plot = '2019-03-04'
-end_plot = '2019-03-08'
-
-# --- Constants ---
+s_steps = [60, 360, 600, 900]
 mean_drawoff_vol_per_day = 200
-categories = 1
+categories = 4
 
 
 def main():
@@ -46,11 +42,10 @@ def main():
             daylight_saving=False)
 
         # compare the resampled series with the non-resampled one.
-        OpenDHW.compare_generators(
+        OpenDHW.plot_three_histplots(
             timeseries_df_1=timeseries_df_resampled,
             timeseries_df_2=timeseries_df,
-            start_plot=start_plot,
-            end_plot=end_plot,
+            timeseries_df_3=timeseries_df_dhwcalc
         )
 
 

@@ -1431,6 +1431,81 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
     return
 
 
+def plot_three_histplots(timeseries_df_1, timeseries_df_2, timeseries_df_3):
+    """
+    Compares two methods of computing the water flow time series by means of
+    a subplot.
+    :param timeseries_df_1:     list:   first water flow time series
+    :param timeseries_df_2:     list:   second water flow time series
+    """
+
+    # detailed distribution is designed to compare timeseries with one
+    # drawoff category.
+    cats_1 = timeseries_df_1['categories'][0]
+    cats_2 = timeseries_df_2['categories'][0]
+    if cats_1 or cats_2 == 1:
+        plot_detailed_distribution = False
+
+    # compute Stats for the title
+    drawoffs_1 = timeseries_df_1[timeseries_df_1['Water_LperH'] != 0][
+        'Water_LperH']
+
+    drawoffs_2 = timeseries_df_2[timeseries_df_2['Water_LperH'] != 0][
+        'Water_LperH']
+
+    drawoffs_3 = timeseries_df_3[timeseries_df_3['Water_LperH'] != 0][
+        'Water_LperH']
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
+    fig.tight_layout()
+
+    # plot the distribution
+    # https://seaborn.pydata.org/generated/seaborn.displot.html
+    ax1 = sns.histplot(ax=ax1, data=drawoffs_1, kde=True)
+    ax2 = sns.histplot(ax=ax2, data=drawoffs_2, kde=True)
+    ax3 = sns.histplot(ax=ax3, data=drawoffs_3, kde=True)
+
+    # --- Set titles and Labels ---
+    title_str_1 = make_title_str(timeseries_df=timeseries_df_1)
+    ax1.set_title(title_str_1)
+    ax1.set_ylabel('Count in a Year')
+
+    title_str_2 = make_title_str(timeseries_df=timeseries_df_2)
+    ax2.set_title(title_str_2)
+    ax2.set_ylabel('Count in a Year')
+
+    title_str_3 = make_title_str(timeseries_df=timeseries_df_3)
+    ax3.set_title(title_str_3)
+    ax3.set_ylabel('Count in a Year')
+    ax3.set_xlabel('Flowrate [L/h]')
+
+
+
+    # --- set both axes to the same y limit ---
+    ymin1, ymax1 = ax1.get_ylim()
+    ymin2, ymax2 = ax2.get_ylim()
+    ymin3, ymax3 = ax3.get_ylim()
+
+    ymax_set = max(ymax1, ymax2, ymax3)
+
+    ax1.set_ylim(ymin1, ymax_set)
+    ax2.set_ylim(ymin2, ymax_set)
+    ax3.set_ylim(ymin3, ymax_set)
+
+    # --- set both axes to the same x limit ---
+    xmin1, xmax1 = ax1.get_xlim()
+    xmin2, xmax2 = ax2.get_xlim()
+    xmin3, xmax3 = ax3.get_xlim()
+
+    xmax_set = max(xmax1, xmax2, xmax3)
+
+    ax1.set_xlim(xmin1, xmax_set)
+    ax2.set_xlim(xmin2, xmax_set)
+    ax3.set_xlim(xmin3, xmax_set)
+
+    plt.show()
+
+
 def jensen_shannon_distance(p, q):
     """
     method to compute the Jenson-Shannon Distance between two probability
