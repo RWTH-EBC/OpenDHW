@@ -15,9 +15,11 @@ can then be compared.
 s_step = 600
 start_plot = '2019-03-04'
 end_plot = '2019-03-05'
-people = 5
-mean_drawoff_vol_per_day = people * 40
+mean_drawoff_vol_per_day = 200
 dir_output = Path.cwd().parent / "Saved_Timeseries"
+
+# --- constants ---
+categories = 1
 
 
 def main():
@@ -25,7 +27,7 @@ def main():
     # Load time-series from DHWcalc
     timeseries_df = OpenDHW.import_from_dhwcalc(
         s_step=s_step,
-        categories=1,
+        categories=categories,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
         daylight_saving=False
     )
@@ -48,7 +50,8 @@ def main():
     # generate time-series with OpenDHW
     timeseries_df_opendhw = OpenDHW.generate_dhw_profile(
         s_step=s_step,
-        mean_drawoff_vol_per_day=200,
+        categories=categories,
+        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
 
     # Compute Heat from Water TimeSeries

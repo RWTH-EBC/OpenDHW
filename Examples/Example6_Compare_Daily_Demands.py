@@ -14,32 +14,47 @@ reverse-engineered:
 # --- Parameters ---
 daily_demands = [160, 200, 240]  # L
 s_step = 60
+categories = 4
+resample_method = True
 start_plot = '2019-04-05'
 end_plot = '2019-04-07'
 plot_date_slice = False
-plot_detailed_distribution = True
 
 # --- Constants ---
-categories = 1
 
 
 def main():
 
-    for daily_deamnd in daily_demands:
+    for daily_demand in daily_demands:
 
         # Load time-series from DHWcalc
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
             categories=categories,
-            mean_drawoff_vol_per_day=daily_deamnd,
+            mean_drawoff_vol_per_day=daily_demand,
             daylight_saving=False
         )
 
-        # generate time-series with OpenDHW
-        open_dhw_df = OpenDHW.generate_dhw_profile(
-            s_step=s_step,
-            mean_drawoff_vol_per_day=daily_deamnd
-        )
+        if not resample_method:
+            # generate time-series with OpenDHW
+            open_dhw_df = OpenDHW.generate_dhw_profile(
+                s_step=s_step,
+                categories=categories,
+                mean_drawoff_vol_per_day=daily_demand,
+            )
+
+        else:
+
+            # generate time-series with OpenDHW
+            open_dhw_df = OpenDHW.generate_dhw_profile(
+                s_step=60,
+                categories=categories,
+                mean_drawoff_vol_per_day=daily_demand,
+            )
+
+            # resample to the desired stepwidth
+            open_dhw_df = OpenDHW.resample_water_series(
+                timeseries_df=open_dhw_df, s_step_output=s_step)
 
         # compare both time-series
         OpenDHW.compare_generators(

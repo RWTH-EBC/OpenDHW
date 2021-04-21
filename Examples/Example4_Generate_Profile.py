@@ -2,7 +2,7 @@
 import OpenDHW
 
 """
-This Example generates an OpenDHW Timeseries, based on DHWcalc with 1 category.
+This Example generates an OpenDHW Timeseries.
 
 Like DHWcalc, OpenDHW need a parametrisation. The usual parametrisation for 
 households is 40 L/(person*day). Thus, a 5 person single family house has a mean
@@ -15,44 +15,66 @@ drawoff rate of 2000 L/day.
 For non-residental buildings, the daily probability functions should be 
 altered, as there are no typical shower or cooking periods in the morning
 and the evening.
+
+As OpenDHW sometimes doesnt seem to work with s_step != 60, a workaround has 
+been implemented: the 'resample_water_series' function.
+
+The idea is to always generate a timeseries with s_step=60s and then resample it
+afterwards to the desired output stepwidth. The disadvantage is a higher 
+computing time.
 """
 
-# --- Parameter Section ---
-s_step = 600
-people = 5
 
-# --- Plot Parameters ---
+# --- Parameters ---
+s_step = 900
+resample_method = True
+mean_drawoff_vol_per_day = 200
+categories = 4
 start_plot = '2019-03-31'
 end_plot = '2019-04-01'
+temp_dT = 35    # K
 
 # --- Constants ---
-mean_drawoff_vol_per_day_and_person = 40
-mean_drawoff_vol_per_day = mean_drawoff_vol_per_day_and_person * people
 
 
 def main():
 
-    # generate time-series with OpenDHW
-    timeseries_df = OpenDHW.generate_dhw_profile(
-        s_step=60,
-        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
-    )
+    if not resample_method:
+        # generate time-series with OpenDHW
+        timeseries_df = OpenDHW.generate_dhw_profile(
+            s_step=s_step,
+            categories=categories,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        )
 
-    timeseries_df = OpenDHW.resample_water_series(
-        timeseries_df=timeseries_df, rule=str(s_step) + 'S')
+    else:
+
+        # generate time-series with OpenDHW
+        timeseries_df = OpenDHW.generate_dhw_profile(
+            s_step=60,
+            categories=categories,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        )
+
+        # resample to the desired stepwidth
+        timeseries_df = OpenDHW.resample_water_series(
+            timeseries_df=timeseries_df, s_step_output=s_step)
 
     # Compute Heat from Water TimeSeries
     timeseries_df = OpenDHW.compute_heat(
         timeseries_df=timeseries_df,
-        temp_dT=35
+        temp_dT=temp_dT
     )
 
     # example timeseries which could be fed into Dymola
     water_series = timeseries_df['Water_L']
     heat_series = timeseries_df['Heat_kWh']
 
+    # inspect the drawoff events
+    drawoffs_df = OpenDHW.get_drawoffs(timeseries_df)
+
     # Generate Histogram from the loaded timeseries
-    OpenDHW.draw_histplot(timeseries_df=timeseries_df)
+    OpenDHW.draw_histplot(timeseries_df=timeseries_df, extra_kde=False)
 
     # Generate Lineplot from the loaded timeseries
     OpenDHW.draw_lineplot(timeseries_df=timeseries_df, start_plot=start_plot,

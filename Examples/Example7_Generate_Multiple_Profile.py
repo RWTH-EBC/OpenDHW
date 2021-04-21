@@ -12,14 +12,18 @@ dataframe.
 s_step = 600
 runs = 5
 
+# --- constants ---
+mean_drawoff_vol_per_day = 200
+categories = 1
+
 
 def main():
 
     # generate timeseries
     timeseries_df = OpenDHW.generate_dhw_profile(
         s_step=s_step,
-        mean_drawoff_vol_per_day=200,
-        initial_day=0,
+        categories=categories,
+        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
 
     timeseries_df = OpenDHW.add_additional_runs(

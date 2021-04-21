@@ -41,8 +41,6 @@ def main():
     # distribute that av. list over a year
     timeseries_df_av = OpenDHW.generate_yearly_probability_profile(
         s_step=s_step,
-        weekend_weekday_factor=1.2,
-        initial_day=0
     )
 
     timeseries_df_av = OpenDHW.distribute_drawoffs(
@@ -62,7 +60,9 @@ def main():
 
     # Load time-series from DHWcalc
     timeseries_df_dhwcalc = OpenDHW.import_from_dhwcalc(
-        s_step=s_step, categories=1, daylight_saving=False
+        s_step=s_step,
+        categories=timeseries_df_av['categories'][0],
+        daylight_saving=False
     )
 
     # compare two time-series

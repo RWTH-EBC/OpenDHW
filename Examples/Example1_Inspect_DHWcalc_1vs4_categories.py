@@ -14,7 +14,7 @@ to reverse-engineer the DHWcalc algorithm, both for 1 category and 4 categories.
 s_steps = [60, 360, 600, 900]
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
-draw_lineplot = True   # does not really add insights here
+draw_lineplot = False   # does not really add insights here
 
 # --- Constants ---
 mean_drawoff_vol_per_day = 200

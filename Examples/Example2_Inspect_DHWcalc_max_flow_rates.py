@@ -23,12 +23,16 @@ def main():
 
     timeseries_lst = []
 
-    # for each chosen max. flowrate, import the DHcalc Timeseries.
+    # for each chosen max. flowrate, import the DHWcalc Timeseries.
     for max_flowrate in max_flowrates:
 
         # Load time-series from DHWcalc
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
-            s_step=s_step, daylight_saving=False, max_flowrate=max_flowrate)
+            s_step=s_step,
+            daylight_saving=False,
+            categories=1,
+            max_flowrate=max_flowrate
+        )
 
         timeseries_lst.append(dhwcalc_df)
 
