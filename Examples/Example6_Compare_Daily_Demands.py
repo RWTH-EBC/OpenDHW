@@ -8,12 +8,12 @@ demands and compares them to their OpenDHW Equivalent.
 This has to do with the Behaviour of DHWcalc when cutting the original Gauss 
 Distribution and adding noise. The behaviour is still not perfectly 
 reverse-engineered:
-(OpenDHW/DHWcalc_Screenshots/99_Theory_Drawoffs_1Category.png)
+(OpenDHW/DHWcalc_Screenshots)
 """
 
 # --- Parameters ---
-daily_demands = [160, 200, 240]  # L
-s_step = 60
+daily_demands = [160, 200, 240, 2000]  # 160, 200, 240, 2000
+s_step = 900
 categories = 4
 resample_method = True
 start_plot = '2019-04-05'
@@ -63,7 +63,7 @@ def main():
             start_plot=start_plot,
             end_plot=end_plot,
             plot_date_slice=plot_date_slice,
-            plot_detailed_distribution=plot_detailed_distribution
+            plot_detailed_distribution=True
         )
 
 

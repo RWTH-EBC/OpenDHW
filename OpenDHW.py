@@ -64,7 +64,8 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
 
     dhw_profile = Path.cwd().parent / "DHWcalc_Files" / dhw_file
 
-    assert dhw_profile.exists(), 'No DHWcalc File for the selected parameters.'
+    assert dhw_profile.exists(), 'No DHWcalc File for the selected ' \
+                                 'parameters: {}'.format(dhw_file)
 
     # Flowrate in Liter per Hour in each Step
     water_LperH = [int(word.strip('\n')) for word in
