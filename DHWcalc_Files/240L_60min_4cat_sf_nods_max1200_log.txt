@@ -1,0 +1,59 @@
+
+ LOGFILE  DHW0001\DHW0001_log.txt
+
+  for a single family house
+
+
+  Total duration:           365 days
+  Start day :               1. day of the year
+  Mean daily draw-off vol.: 240 l/day
+  No. of categories:        4
+  Time step duration:       60 min
+  Daylight saving time:     not applied
+
+
+ FLOW RATE SETTINGS
+
+  Categories:              1    2     3     4
+
+  Mean flow Rate:         1   6   140   40  l/h
+  Duration of draw-off:   60     60     60     60  min
+  portion:                14    36    10    40  %
+  sigma:                  2   2   2   2  l/h
+  min. flow rate:         1 l/h
+  max. flow rate:         1200 l/h
+
+
+ PROBABILITY FUNCTION SETTINGS
+
+  Step function probability distribution for weekdays + weekend-days
+
+  Mean DHW-volume tapped during 6 time periods:
+  weekdays
+  time period   ratio of daily DHW-volume
+  22:00-06:30      2 %
+  06:30-07:30      50 %
+  07:30-12:00      6 %
+  12:00-13:00      16 %
+  13:00-18:00      6 %
+  18:00-22:00      20 %
+
+  weekend-days
+  time period   ratio of daily DHW-volume
+  23:00-07:00      3.8 %
+  07:00-09:00      47.5 %
+  09:00-15:00      7.1 %
+  15:00-17:00      23.8 %
+  17:00-20:00      3.6 %
+  20:00-23:00      14.3 %
+
+  Ratio of the mean daily draw-off volume tapped 
+
+    on weekend-days/on weekdays: 120 %
+  Seasonal Variations:
+    Sine amplitude:      10 %
+    Day of sine maximum: 45
+
+  Holiday Periods:
+
+
