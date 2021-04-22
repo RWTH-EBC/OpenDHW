@@ -1562,7 +1562,7 @@ def make_title_str(timeseries_df):
     """
 
     # compute additional stats for title
-    s_step = timeseries_df.index.freqstr
+    s_step = get_s_step(timeseries_df)
     yearly_water_demand = timeseries_df['Water_L'].sum()  # in L
     drawoffs = timeseries_df[timeseries_df['Water_LperH'] != 0]['Water_LperH']
     max_water_flow = timeseries_df['Water_LperH'].max()
@@ -1588,6 +1588,8 @@ def make_title_str(timeseries_df):
             cols_LperH = [name for name in col_names if 'Water_L_' in name]
             water_LperH_df = timeseries_df[cols_LperH]
 
+            # todo: sum not the same here, because of workaround in
+            #  superpositioning
             cats_str = ''
             for col in cols_LperH:
                 cat_sum = water_LperH_df[col].sum()
@@ -1679,3 +1681,53 @@ def resample_water_series(timeseries_df, s_step_output):
         timeseries_df_re = timeseries_df
 
     return timeseries_df_re
+
+
+def reduce_no_drawoffs(timeseries_df):
+    """
+    for some reason, DHWcalc still yields less yearly drawoffs than OpenDHW.
+    In case the yearly water demand is higher in an OpenDHW timeseries than
+    the expected one, this function removes some randomly selected drawoffs
+    events with a small flowrate to reduce the yearly water demand until its
+    just under the expected one and simultanieously decreasing the number of
+    drawoffs.
+    """
+
+    # get the expected yearly water demand
+    expected_yearly_water = timeseries_df['mean_drawoff_vol_per_day'][0] * 365
+    actual_yearly_water = timeseries_df['Water_L'].sum()
+
+    if expected_yearly_water < actual_yearly_water:
+
+        # select a cut off flow rate
+        max_flow_rate = timeseries_df['Water_LperH'].max()
+        min_flow_rate = \
+            timeseries_df[timeseries_df['Water_LperH'] != 0].min()['Water_LperH']
+        cut_off_flow_rate = max(min_flow_rate * 5, max_flow_rate / 200)
+
+        # shuffle df so random days are selected when iterated over.
+        timeseries_df_shuffled = timeseries_df.sample(frac=1).reset_index(
+            drop=False)
+
+        # loop over the shuffled timeseries and set some vales to 0.
+        for i in timeseries_df_shuffled.index:
+
+            curr_sum = timeseries_df_shuffled['Water_L'].sum()
+            if curr_sum <= expected_yearly_water:
+                break
+
+            curr_flow_rate = timeseries_df_shuffled['Water_LperH'][i]
+            if curr_flow_rate != 0 and curr_flow_rate < cut_off_flow_rate:
+                timeseries_df_shuffled.loc[i, 'Water_L'] = 0
+                timeseries_df_shuffled.loc[i, 'Water_LperH'] = 0
+
+        # un-shuffle df
+        timeseries_df_shuffled = timeseries_df_shuffled.set_index('index')
+        timeseries_df_cleaned = timeseries_df_shuffled.sort_index()
+
+    else:
+        timeseries_df_cleaned = timeseries_df
+        print('No drawoffs have neen reduced, as expected_yearly_water >= '
+              'actual_yearly_water')
+
+    return timeseries_df_cleaned
