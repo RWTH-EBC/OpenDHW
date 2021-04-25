@@ -82,22 +82,24 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
     timeseries_df['Water_L'] = timeseries_df['Water_LperH'] / 3600 * s_step
     timeseries_df['method'] = 'DHWcalc'
     timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
-    timeseries_df['sdtdev_drawoff_vol_per_day'] = mean_drawoff_vol_per_day / 4
     timeseries_df['categories'] = categories
     timeseries_df['initial_day'] = 0
     timeseries_df['weekend_weekday_factor'] = 1.2
+    timeseries_df['sdtdev_drawoff_vol_per_day'] = mean_drawoff_vol_per_day / 4
 
-    mean_vol_per_drawoff = 8  # constant DHWcalc 1 category
-    timeseries_df['mean_vol_per_drawoff'] = mean_vol_per_drawoff
+    if categories == 1:
+        mean_vol_per_drawoff = 8  # constant DHWcalc 1 category
+        timeseries_df['mean_vol_per_drawoff'] = 8
 
-    av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
-    timeseries_df['mean_drawoff_flow_rate_LperH'] = av_drawoff_flow_rate
+        av_drawoff_flow_rate = mean_vol_per_drawoff * 3600 / s_step  # in L/h
+        timeseries_df['mean_drawoff_flow_rate_LperH'] = av_drawoff_flow_rate
 
-    sdt_dev_drawoff_flow_rate = av_drawoff_flow_rate / 4  # in L/h
-    timeseries_df['sdtdev_drawoff_flow_rate_LperH'] = sdt_dev_drawoff_flow_rate
+        sdt_dev_drawoff_flow_rate = av_drawoff_flow_rate / 4  # in L/h
+        timeseries_df[
+            'sdtdev_drawoff_flow_rate_LperH'] = sdt_dev_drawoff_flow_rate
 
-    mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
-    timeseries_df['mean_no_drawoffs_per_day'] = mean_no_drawoffs_per_day
+        mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
+        timeseries_df['mean_no_drawoffs_per_day'] = mean_no_drawoffs_per_day
 
     return timeseries_df
 
@@ -261,13 +263,13 @@ def get_data_drawoff_categories(s_step, mean_drawoff_vol_per_day):
 
     # add max flow rate: Max(1200, highest category mean flow rate)
     cats_df['max_flow_rate_per_drawoff_LperH'] = max(cats_df[
-        'mean_flow_rate_per_drawoff_LperH'].max(), 1200)
-
+                                                         'mean_flow_rate_per_drawoff_LperH'].max(),
+                                                     1200)
 
     return cats_df
 
 
-def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
+def generate_daily_probability_step_function(mode, s_step, save_fig=False):
     """
     Generates probabilities for a day with 6 periods. Corresponds to the mode
     "step function for weekdays and weekends" in DHWcalc and uses the same
@@ -282,18 +284,35 @@ def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
 
     # todo: add profiles for non-residential buildings
 
-    if mode == 'weekday':
+    if s_step <= 1800:
+        if mode == 'weekday':
 
-        steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
-                        (5, 0.06), (4, 0.2), (2, 0.01)]
+            steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
+                            (5, 0.06), (4, 0.2), (2, 0.01)]
 
-    elif mode == 'weekend':
+        elif mode == 'weekend':
 
-        steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
-                        (3, 0.036), (3, 0.143), (1, 0.018)]
+            steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
+                            (3, 0.036), (3, 0.143), (1, 0.018)]
 
+        else:
+            raise Exception('Unknown Mode. Please Choose "Weekday" or '
+                            '"Weekend".')
     else:
-        raise Exception('Unknown Mode. Please Choose "Weekday" or "Weekend".')
+        if mode == 'weekday':
+
+            # no more half steps
+            steps_and_ps = [(7, 0.01), (1, 0.5), (4, 0.06), (1, 0.16),
+                            (5, 0.06), (4, 0.2), (2, 0.01)]
+
+        elif mode == 'weekend':
+
+            steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
+                            (3, 0.036), (3, 0.143), (1, 0.018)]
+
+        else:
+            raise Exception('Unknown Mode. Please Choose "Weekday" or '
+                            '"Weekend".')
 
     steps = [tup[0] for tup in steps_and_ps]
     ps = [tup[1] for tup in steps_and_ps]
@@ -311,9 +330,16 @@ def generate_daily_probability_step_function(mode, s_step, plot_p_day=False):
     # f.e is 3600s (1h), one daily intervall cant be 4.5 hours.
     assert len(p_day) == 24 * 3600 / s_step
 
-    if plot_p_day:
-        plt.plot(p_day)
+    if save_fig:
+        fig, ax = plt.subplots()
+        ax = plt.plot(p_day)
         plt.show()
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+        fname = "Daily_Probability_Profile_{}S_{}".format(s_step, mode)
+        fig.savefig(dir_output / (fname + '.pdf'))
+        fig.savefig(dir_output / (fname + '.svg'))
+        fig.savefig(dir_output / (fname + '.png'))
 
     return p_day
 
@@ -379,10 +405,10 @@ def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
     weekend is increased. If its smaller than 1, the probability on the
     weekend is decreased.
 
-    :param p_weekday:   list:   probabilites for 1 day of the week [0...1]
-    :param p_weekend:   list:   probabilitiers for 1 day of the weekend [0...1]
-    :param factor:      float:  factor to shift the probabiliters between
-                                weekdays and weekenddays
+    :param p_weekday:   list:   probabilities for 1 day of the week [0...1]
+    :param p_weekend:   list:   probabilities for 1 day of the weekend [0...1]
+    :param factor:      float:  factor to shift the probabilities between
+                                weekdays and weekend-days
     :return:
     """
 
@@ -406,7 +432,8 @@ def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
     return p_wd_weighted, p_we_weighted, av_p_week_weighted
 
 
-def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
+def generate_yearly_probabilities(initial_day, p_weekend, p_weekday,
+                                  s_step, plot_p_yearly=True):
     """
     Takes the probabilities of a weekday and a weekendday and generates a
     list of yearly probabilities by adding a seasonal probability factor.
@@ -440,10 +467,22 @@ def generate_yearly_probabilities(initial_day, p_weekend, p_weekday, s_step):
             probability = p_day[step] * probability_season
             p_final.append(probability)
 
+    if plot_p_yearly:
+        fig, ax = plt.subplots()
+        plt.plot(p_final)
+        plt.show()
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+        fname = "Yearly_Probability_Profile_{}initalday_{}S".format(
+            initial_day, s_step)
+        fig.savefig(dir_output / (fname + '.pdf'))
+        fig.savefig(dir_output / (fname + '.svg'))
+        fig.savefig(dir_output / (fname + '.png'))
+
     return p_final
 
 
-def normalize_and_sum_list(lst):
+def normalize_and_sum_list(lst, save_fig=True):
     """
     takes a list and normalizes it based on the sum of all list elements.
     then generates a new list based on the current sum of each list entry.
@@ -461,6 +500,17 @@ def normalize_and_sum_list(lst):
     for entry in lst_norm:
         current_sum += entry
         lst_norm_integral.append(current_sum)
+
+    if save_fig:
+        fig, ax = plt.subplots()
+        plt.plot(lst_norm_integral)
+        plt.show()
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+        fname = "Normed_and_summed_probability_profile"
+        fig.savefig(dir_output / (fname + '.pdf'))
+        fig.savefig(dir_output / (fname + '.svg'))
+        fig.savefig(dir_output / (fname + '.png'))
 
     return lst_norm_integral
 
@@ -912,14 +962,23 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
     plt.show()
 
     if save_fig:
+        method = timeseries_df['method'][0]
+        s_step = get_s_step(timeseries_df)
+        vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
+        cats = timeseries_df['categories'][0]
+
         dir_output = Path.cwd() / "plots"
         dir_output.mkdir(exist_ok=True)
-        fig.savefig(dir_output / "Demand_{}_sliced.pdf".format(method))
+        fname = "Lineplot_{}_{}S_{}LperDay_{}cats".format(
+            method, s_step, vol_per_day, cats)
+        fig.savefig(dir_output / (fname + '.pdf'))
+        fig.savefig(dir_output / (fname + '.svg'))
+        fig.savefig(dir_output / (fname + '.png'))
 
     return fig
 
 
-def draw_histplot(timeseries_df, extra_kde=False):
+def draw_histplot(timeseries_df, extra_kde=False, save_fig=False):
     """
     Takes a DHW profile and plots a histogram with some stats in the title
     :param timeseries_df:   Dataframe that holds the water timeseries
@@ -947,6 +1006,21 @@ def draw_histplot(timeseries_df, extra_kde=False):
     ax1.set_title(title_str)
 
     plt.show()
+
+    if save_fig:
+        method = timeseries_df['method'][0]
+        s_step = get_s_step(timeseries_df)
+        vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
+        cats = timeseries_df['categories'][0]
+
+        dir_output = Path.cwd() / "plots"
+        dir_output.mkdir(exist_ok=True)
+
+        fname = "Histplot_{}_{}S_{}LperDay_{}cats".format(method, s_step,
+                                                          vol_per_day, cats)
+        fig.savefig(dir_output / (fname + '.pdf'))
+        fig.savefig(dir_output / (fname + '.svg'))
+        fig.savefig(dir_output / (fname + '.png'))
 
 
 def draw_detailed_histplot(timeseries_df):
@@ -1480,8 +1554,6 @@ def plot_three_histplots(timeseries_df_1, timeseries_df_2, timeseries_df_3):
     ax3.set_ylabel('Count in a Year')
     ax3.set_xlabel('Flowrate [L/h]')
 
-
-
     # --- set both axes to the same y limit ---
     ymin1, ymax1 = ax1.get_ylim()
     ymin2, ymax2 = ax2.get_ylim()
@@ -1703,7 +1775,8 @@ def reduce_no_drawoffs(timeseries_df):
         # select a cut off flow rate
         max_flow_rate = timeseries_df['Water_LperH'].max()
         min_flow_rate = \
-            timeseries_df[timeseries_df['Water_LperH'] != 0].min()['Water_LperH']
+            timeseries_df[timeseries_df['Water_LperH'] != 0].min()[
+                'Water_LperH']
         cut_off_flow_rate = max(min_flow_rate * 5, max_flow_rate / 200)
 
         # shuffle df so random days are selected when iterated over.
