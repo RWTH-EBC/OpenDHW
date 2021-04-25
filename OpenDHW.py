@@ -141,7 +141,10 @@ def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
     if categories == 4:
 
         cats_df = get_data_drawoff_categories(
-            s_step=s_step, mean_drawoff_vol_per_day=mean_drawoff_vol_per_day)
+            s_step=s_step,
+            categories=categories,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
+        )
 
         # deterministic
         timeseries_df = generate_yearly_probability_profile(
@@ -151,7 +154,7 @@ def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
         )
 
         for i in range(len(cats_df)):
-            timeseries_df = generate_and_distribute_drawoffs_cats(
+            timeseries_df = generate_and_distribute_drawoffs(
                 timeseries_df=timeseries_df,
                 cats_series=cats_df.iloc[i],
             )
@@ -163,8 +166,8 @@ def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
 
         # todo: find better way of superpositioning subject to max
         global_max_flow_rate = cats_df['max_flow_rate_per_drawoff_LperH'][0]
-        timeseries_df.loc[timeseries_df['Water_LperH'] > global_max_flow_rate,
-                          'Water_LperH'] = global_max_flow_rate
+        # timeseries_df.loc[timeseries_df['Water_LperH'] > global_max_flow_rate,
+        #                   'Water_LperH'] = global_max_flow_rate
 
         timeseries_df['Water_L'] = timeseries_df['Water_LperH'] / 3600 * s_step
 
@@ -176,6 +179,41 @@ def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
         timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
 
     elif categories == 1:
+
+        cats_df = get_data_drawoff_categories(
+            s_step=s_step,
+            categories=categories,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
+        )
+
+        # deterministic
+        timeseries_df = generate_yearly_probability_profile(
+            s_step=s_step,
+            weekend_weekday_factor=1.2,
+            initial_day=0
+        )
+
+        for i in range(len(cats_df)):
+            timeseries_df = generate_and_distribute_drawoffs(
+                timeseries_df=timeseries_df,
+                cats_series=cats_df.iloc[i],
+            )
+
+        col_names = list(timeseries_df.columns)
+        cols_LperH = [name for name in col_names if 'Water_LperH' in name]
+        water_LperH_df = timeseries_df[cols_LperH]
+        timeseries_df['Water_LperH'] = water_LperH_df.sum(axis=1)
+
+        timeseries_df['Water_L'] = timeseries_df['Water_LperH'] / 3600 * s_step
+
+        timeseries_df['method'] = 'OpenDHW'
+        timeseries_df['categories'] = len(cats_df.index)
+        timeseries_df['drawoff_method'] = 'gauss_categories'
+        timeseries_df['initial_day'] = initial_day
+        timeseries_df['weekend_weekday_factor'] = weekend_weekday_factor
+        timeseries_df['mean_drawoff_vol_per_day'] = mean_drawoff_vol_per_day
+
+    elif categories == 1111111:
 
         drawoff_method = 'gauss_combined'
         mean_vol_per_drawoff = 8
@@ -215,18 +253,34 @@ def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
     return timeseries_df
 
 
-def get_data_drawoff_categories(s_step, mean_drawoff_vol_per_day):
+def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
     """
     get the data for the drawoofs when chooseing 4 categories.
     """
+    if categories == 4:
+        cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [60, 360, 840, 480],
+                        'drawoff_duration_min': [1, 1, 10, 5],
+                        'portion': [0.14, 0.36, 0.1, 0.4],
+                        'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12,
+                                                               24],
+                        }
 
-    cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [60, 360, 840, 480],
-                    'drawoff_duration_min': [1, 1, 10, 5],
-                    'portion': [0.14, 0.36, 0.1, 0.4],
-                    'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12, 24],
-                    }
+        cats_df = pd.DataFrame(data=cats_data_60)
+        # sort by duration distributes long drawoff types first.
+        cats_df.sort_values(by=['drawoff_duration_min'], ascending=False,
+                            inplace=True)
+        pass
 
-    cats_df = pd.DataFrame(data=cats_data_60)
+    elif categories == 1:
+        cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [480],
+                        'drawoff_duration_min': [1],
+                        'portion': [1],
+                        'stddev_flow_rate_per_drawoff_LperH': [120],
+                        }
+
+        cats_df = pd.DataFrame(data=cats_data_60)
+    else:
+        raise Exception('unkown number of categories')
 
     # if DHWcalc uses 4 categories with a timestep other than 60s,
     # the drawoffs data has to be altered.
@@ -262,9 +316,8 @@ def get_data_drawoff_categories(s_step, mean_drawoff_vol_per_day):
         cats_df['mean_no_drawoffs_per_day'] * 365
 
     # add max flow rate: Max(1200, highest category mean flow rate)
-    cats_df['max_flow_rate_per_drawoff_LperH'] = max(cats_df[
-                                                         'mean_flow_rate_per_drawoff_LperH'].max(),
-                                                     1200)
+    cats_df['max_flow_rate_per_drawoff_LperH'] \
+        = max(cats_df['mean_flow_rate_per_drawoff_LperH'].max(), 1200)
 
     return cats_df
 
@@ -278,7 +331,7 @@ def generate_daily_probability_step_function(mode, s_step, save_fig=False):
 
     :param mode:        string: decide to compute for a weekday of a weekend day
     :param s_step:      int:    seconds within a timestep
-    :param plot_p_day:  Bool:   decide to plot the probability distribution
+    :param save_fig:    Bool:   decide to plot the probability distribution
     :return: p_day      list:   the probability distribution for one day.
     """
 
@@ -290,10 +343,16 @@ def generate_daily_probability_step_function(mode, s_step, save_fig=False):
             steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
                             (5, 0.06), (4, 0.2), (2, 0.01)]
 
+            # just as a test, if p is very concentrated.
+            # steps_and_ps = [(6.5, 0.0), (1, 1), (16.5, 0)]
+
         elif mode == 'weekend':
 
             steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
                             (3, 0.036), (3, 0.143), (1, 0.018)]
+
+            # just as a test, if p is very concentrated.
+            # steps_and_ps = [(7, 0), (2, 1), (15, 0)]
 
         else:
             raise Exception('Unknown Mode. Please Choose "Weekday" or '
@@ -433,7 +492,7 @@ def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
 
 
 def generate_yearly_probabilities(initial_day, p_weekend, p_weekday,
-                                  s_step, plot_p_yearly=True):
+                                  s_step, plot_p_yearly=False):
     """
     Takes the probabilities of a weekday and a weekendday and generates a
     list of yearly probabilities by adding a seasonal probability factor.
@@ -482,7 +541,7 @@ def generate_yearly_probabilities(initial_day, p_weekend, p_weekday,
     return p_final
 
 
-def normalize_and_sum_list(lst, save_fig=True):
+def normalize_and_sum_list(lst, save_fig=False):
     """
     takes a list and normalizes it based on the sum of all list elements.
     then generates a new list based on the current sum of each list entry.
@@ -515,7 +574,7 @@ def normalize_and_sum_list(lst, save_fig=True):
     return lst_norm_integral
 
 
-def generate_and_distribute_drawoffs_cats(timeseries_df, cats_series):
+def generate_and_distribute_drawoffs(timeseries_df, cats_series):
     """
     when choosing "4 categories"
 
@@ -552,29 +611,60 @@ def generate_and_distribute_drawoffs_cats(timeseries_df, cats_series):
     p_drawoffs.sort()
     p_norm_integral.sort()
 
+    # make sublusts from p_drawoffs:
+    # workaround to solve issue with multiple drawoffs at the same timestep,
+    # could be solved differently probably.
+    p_drawoffs_lsts = []
+    pieces = 15  # the higher the s_step, the more pieces are needed!
+    for i in range(pieces):
+        p_drawoffs_i = p_drawoffs[i::pieces]
+        p_drawoffs_lsts.append(p_drawoffs_i)
+
     # --- distribute drawoffs
     drawoff_count = 0
 
     # for return statement
     water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+    max_flow_rate = cats_series['max_flow_rate_per_drawoff_LperH']
 
-    for time_step, p_current_sum in enumerate(p_norm_integral):
+    for p_drawoffs_lst in p_drawoffs_lsts:
 
-        if water_LperH[time_step] != 0:
-            continue
+        sub_drawoff_count = 0
 
-        if p_drawoffs[drawoff_count] < p_current_sum:
+        # loop p_norm_integral and place drawoffs:
+        for time_step, p_current_sum in enumerate(p_norm_integral):
 
-            drawoff = drawoffs[drawoff_count]
-            drawoffs_time_step_delta = [drawoff] * drawoff_steps
+            if water_LperH[time_step] >= max_flow_rate:
+                continue
 
-            for i in range(drawoff_steps):
-                water_LperH[time_step + i] = drawoffs_time_step_delta[i]
+            if p_drawoffs_lst[sub_drawoff_count] < p_current_sum:
 
-            drawoff_count += 1
+                drawoff = drawoffs[drawoff_count]
+                drawoffs_time_step_delta = [drawoff] * drawoff_steps
 
-            if drawoff_count >= len(drawoffs):
-                break
+                # needed for drawoffs with longer timedeltas? 4cats?
+                drawoff_occured = False
+
+                for i in range(drawoff_steps):
+
+                    if water_LperH[time_step + i] + \
+                            drawoffs_time_step_delta[i] > max_flow_rate:
+                        drawoff_occured = False
+                    else:
+                        water_LperH[time_step + i] += drawoffs_time_step_delta[
+                            i]
+                        drawoff_occured = True
+
+                if drawoff_occured:
+                    sub_drawoff_count += 1
+                    drawoff_count += 1
+
+                if sub_drawoff_count >= len(p_drawoffs_lst):
+                    # drawoff_count += sub_drawoff_count
+                    break
+
+                if drawoff_count >= len(drawoffs):
+                    break
 
     cat_id = int(cats_series['mean_flow_rate_per_drawoff_LperH'])
     timeseries_df['Water_LperH_cat{}'.format(cat_id)] = water_LperH
