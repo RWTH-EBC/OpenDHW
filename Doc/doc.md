@@ -45,16 +45,16 @@ The final probability profile looks is then added as the first column of the Dat
 
 ### Daily probability list step functions
 
-The daily probabilty profile looks like this for a weekend day and a timestep of 60 seconds. The intervalls are taken from DHWcalc.
+The daily probabilty profile looks like this for a weekday and a timestep of 60 seconds. The intervalls are taken from DHWcalc.
 
-![Daily Probability Profile](./saved_plots/Daily_Probability_Profile.pdf)
+![Daily Probability Profile](./saved_plots/Daily_Probability_Profile_60S_weekday.svg)
 
 
 ### Yearly probabilities list
 
 The yearly probabilty list looks like this for a timestep of 3600 seconds and a sesonal factor of 0.1:
 
-![Yearly Probability Profile](./saved_plots/Yearly_Probability_Profile.png)
+![Yearly Probability Profile](./saved_plots/Yearly_Probability_Profile_0initalday_60S.svg)
 
 ### Normalized and summed yearly probability profile
 
