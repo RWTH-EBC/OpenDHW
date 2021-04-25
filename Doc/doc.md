@@ -60,7 +60,7 @@ The yearly probabilty list looks like this for a timestep of 3600 seconds and a 
 
 The normalized and summed probability profile looks like this for a timestep of 3600 seconds and a seasonal factor of 0.1:
 
-![Normed and summed probability profile](./saved_plots/Normed_and_summed_probability_profile.pdf)
+![Normed and summed probability profile](./saved_plots/Normed_and_summed_probability_profile.svg)
 
 
 ## Generation and Placement of Drawoff Events
@@ -194,22 +194,22 @@ Here, some Histogramms for DHWcalc are given:
 
 For a timestep of 1min:
 
-![Histplot_DHWcalc_60S_200LperDay_1cats](./saved_plots/Histplot_DHWcalc_60S_200LperDay_1cats.pdf)
+![Histplot_DHWcalc_60S_200LperDay_1cats](./saved_plots/Histplot_DHWcalc_60S_200LperDay_1cats.svg)
 
-![Histplot_DHWcalc_60S_200LperDay_4cats](./saved_plots/Histplot_DHWcalc_60S_200LperDay_4cats.pdf)
+![Histplot_DHWcalc_60S_200LperDay_4cats](./saved_plots/Histplot_DHWcalc_60S_200LperDay_4cats.svg)
 
 For a timestep of 15mins:
 
-![Histplot_DHWcalc_900S_200LperDay_1cats](./saved_plots/Histplot_DHWcalc_900S_200LperDay_1cats.pdf)
+![Histplot_DHWcalc_900S_200LperDay_1cats](./saved_plots/Histplot_DHWcalc_900S_200LperDay_1cats.svg)
 
-![Histplot_DHWcalc_900S_200LperDay_4cats](./saved_plots/Histplot_DHWcalc_900S_200LperDay_4cats.pdf)
+![Histplot_DHWcalc_900S_200LperDay_4cats](./saved_plots/Histplot_DHWcalc_900S_200LperDay_4cats.svg)
 
 ### OpenDHW
 
 For a timestep of 1min
 
-![Histplot_OpenDHW_60S_200LperDay_4cats](./saved_plots/Histplot_OpenDHW_60S_200LperDay_4cats.pdf)
+![Histplot_OpenDHW](./saved_plots/Histplot_OpenDHW_60S_200LperDay_4cats.svg)
 
 A Lineplot:
 
-![Lineplot_OpenDHW_2019-03-31-2019-04-01_60S_200LperDay_4cats](./saved_plots/Lineplot_OpenDHW_2019-03-31-2019-04-01_60S_200LperDay_4cats.pdf)
+![Lineplot](./saved_plots/Lineplot_OpenDHW_60S_200LperDay_4cats.svg)
