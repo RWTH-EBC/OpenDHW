@@ -26,12 +26,12 @@ computing time.
 
 
 # --- Parameters ---
-s_step = 900
-resample_method = True
+s_step = 60
+resample_method = False
 mean_drawoff_vol_per_day = 200
 categories = 4
-start_plot = '2019-03-31'
-end_plot = '2019-04-01'
+start_plot = '2019-03-31-06'
+end_plot = '2019-03-31-09'
 temp_dT = 35    # K
 
 # --- Constants ---
@@ -72,6 +72,7 @@ def main():
 
     # inspect the drawoff events
     drawoffs_df = OpenDHW.get_drawoffs(timeseries_df)
+    drawoffs_df2 = timeseries_df[timeseries_df['Water_LperH'] != 0]
 
     # Generate Histogram from the loaded timeseries
     OpenDHW.draw_histplot(timeseries_df=timeseries_df, extra_kde=False)

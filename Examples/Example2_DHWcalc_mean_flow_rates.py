@@ -13,11 +13,11 @@ for the generation and distribution of the drawoff event.
 # --- Parameters ---
 start_plot = '2019-03-04-06'
 end_plot = '2019-03-04-10'
+categories = 4
 
 # --- Constants ---
 s_steps = [60, 900, 3600]
 mean_drawoff_vols_per_day = [197, 198, 199, 200, 201, 202, 203]
-categories = 1
 
 
 def main():

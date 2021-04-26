@@ -8,9 +8,9 @@ Timeseries.
 """
 
 # --- Parameters ---
-s_steps = [60, 360, 600, 900]
+s_steps = [60, 360, 600, 900, 3600]
 categories = 4
-resample_method = True
+resample_method = False
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
 

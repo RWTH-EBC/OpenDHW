@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import OpenDHW
+import OpenDHW_depreciated_functions as OpenDHW_old
+
 import pandas as pd
 import random
 
@@ -43,7 +45,8 @@ def main():
         s_step=s_step,
     )
 
-    timeseries_df_av = OpenDHW.distribute_drawoffs(
+    # todo: distribute_drawoffs function outdated!
+    timeseries_df_av = OpenDHW_old.distribute_drawoffs(
         timeseries_df=timeseries_df_av,
         drawoffs=av_drawoffs,
     )
