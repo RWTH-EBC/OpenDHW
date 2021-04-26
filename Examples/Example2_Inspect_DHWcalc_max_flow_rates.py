@@ -22,6 +22,7 @@ max_flowrates = [1188, 1194, 1200, 1206, 1212]
 def main():
 
     timeseries_lst = []
+    drawoffs_lst = []
 
     # for each chosen max. flowrate, import the DHWcalc Timeseries.
     for max_flowrate in max_flowrates:
@@ -35,6 +36,7 @@ def main():
         )
 
         timeseries_lst.append(dhwcalc_df)
+        drawoffs_lst.append(OpenDHW.get_drawoffs(dhwcalc_df))
 
     # plot all generated timeseries
     OpenDHW.plot_multiple_timeseries(
@@ -43,6 +45,8 @@ def main():
         end_plot=end_plot,
         plot_hist=False
     )
+
+    pass
 
 
 if __name__ == '__main__':

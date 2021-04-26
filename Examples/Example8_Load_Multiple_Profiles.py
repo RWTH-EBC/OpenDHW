@@ -40,6 +40,8 @@ def main():
     sum_4 = sum(drawoffs_df.iloc[:, 3].fillna(0))
     sum_5 = sum(drawoffs_df.iloc[:, 4].fillna(0))
 
+    print(sum_av, sum_1, sum_2, sum_3, sum_4, sum_5)
+
     # distribute that av. list over a year
     timeseries_df_av = OpenDHW.generate_yearly_probability_profile(
         s_step=s_step,
