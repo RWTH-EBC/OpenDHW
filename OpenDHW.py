@@ -776,6 +776,10 @@ def draw_histplot(timeseries_df, extra_kde=False, save_fig=False):
     drawoffs_df = get_drawoffs(timeseries_df=timeseries_df,
                                col_part='Water_LperH')
 
+    cats = timeseries_df['categories'][0]
+    if cats == 1:
+        drawoffs_df = drawoffs_df['Water_LperH']
+
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
 
@@ -816,8 +820,9 @@ def draw_detailed_histplot(timeseries_df):
     plot to further analyse timeseries with 1 drawoff category.
     """
     cats = timeseries_df['categories'][0]
+    method = timeseries_df['method'][0]
 
-    if cats == 1:
+    if cats == 1 and method == 'DHWcalc':
 
         # create bin values
         mean = timeseries_df['mean_drawoff_flow_rate_LperH'][0]
@@ -872,8 +877,8 @@ def draw_detailed_histplot(timeseries_df):
         plt.show()
 
     else:
-        print('detailed histplot is only meant to analyse timeseries with one'
-              'drawoff category.')
+        print('detailed histplot is only meant to analyse DHWcalc timeseries '
+              'with one drawoff category.')
 
 
 def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
@@ -1163,7 +1168,11 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         if save_fig:
             dir_output = Path.cwd() / "plots"
             dir_output.mkdir(exist_ok=True)
-            fig.savefig(dir_output / "Timeseries_Comparison_Lineplot.pdf")
+
+            fname = "Timeseries_Comparison_Lineplot"
+            fig.savefig(dir_output / (fname + '.pdf'))
+            fig.savefig(dir_output / (fname + '.svg'))
+            fig.savefig(dir_output / (fname + '.png'))
 
     if plot_distribution:
         # compute Jensen Shannon Distance
@@ -1212,6 +1221,16 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         ax2.set_xlim(xmin2, xmax_set)
 
         plt.show()
+
+        if save_fig:
+            dir_output = Path.cwd() / "plots"
+            dir_output.mkdir(exist_ok=True)
+
+
+            fname = "Timeseries_Comparison_Histplot"
+            fig.savefig(dir_output / (fname + '.pdf'))
+            fig.savefig(dir_output / (fname + '.svg'))
+            fig.savefig(dir_output / (fname + '.png'))
 
     if plot_detailed_distribution:
 
