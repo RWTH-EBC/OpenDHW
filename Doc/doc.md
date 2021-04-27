@@ -119,7 +119,12 @@ No Drawoff  | Flow Rate [L/h]
 
 ### Placement
 
-For each drawoff event, a random value between 0 and 1 is generated. 
+For each drawoff event, a random value between 0 and 1 is generated.
+
+```Python
+	p_drawoffs = [random.uniform(0, 1) for _ in drawoffs]
+```
+
 
 No Drawoff  | probabilities drawoffs
 ------------- | -------------
@@ -156,8 +161,10 @@ We could achieve this by looping over the yearly probability list for each drawo
 
 ```Python
 water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+drawoffs = [23, 56, 87, 123, 254, 23, 402, 335]
+p_drawoffs = [0.41, 0.23, 0.31, 0.97, 0.13, 0.76, 0.04, 0.55]
 
-for p_drawoff_event in drawoff_probabilities_lst:
+for i, p_drawoff_event in enumerate(p_drawoffs):
 
 	for timestep, p_timestep in enumerate(yearly_probabilities_lst):
 		
@@ -167,8 +174,59 @@ for p_drawoff_event in drawoff_probabilities_lst:
 			break
 ```
 
-However, two nested for loops would increase the runstime quadratically O(n^2). Instead the drawoff probabilities list is sorted. Then, the yearly probabilitiy list has only be iterated over once. Everytime a drawoff is placed in the yearly Flow Rates list, the next higher drawoff probability should be selected. If that next probabiliy falls into the same timestep, two drawoffs happen at the same timestep. If not, the iteration of the yearly probability list continues until the drawoff can be placed.
+However, two nested for loops would increase the runstime quadratically O(n^2). Instead the drawoff probabilities list is sorted. Then, the yearly probabilitiy list is iterated over once. Everytime a drawoff is placed in the yearly Flow Rates list, the next higher drawoff probability is be selected by means of a counter.
 
+```Python
+water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+drawoffs = [23, 56, 87, 123, 254, 23, 402, 335]
+p_drawoffs = [0.04, 0.13, 0.23, 0.31, 0.41, 0.55, 0.76, 0.97]
+drawoff_count = 0
+
+for step, p_current_sum in enumerate(p_norm_integral):
+
+    if p_drawoffs[drawoff_count] < p_current_sum:
+        water_LperH[step] = drawoffs[drawoff_count]
+        drawoff_count += 1
+
+        if drawoff_count >= len(drawoffs):
+            break
+```
+
+However, this algorithm doesnt allow for the possibility for two drawoffs to fall into the same timestep (a feature that is crutial to DHWcalc).
+Thus, like in the algorithm before, everytime a drawoff is placed in the yearly Flow Rates list, the next higher drawoff probability should be selected by means of a counter. Then, if that next drawoff probabiliy falls into the same timestep, two drawoffs happen at the same timestep. If not, the iteration of the yearly probability list continues until the drawoff can be placed. Right now, this algorithm hasent fully implemented as bescribed above. Rather, the drawoff_probabilities_lst is split up in smaller pieces, which are then distributed like the algorithm above. F.e. if the drawoff probabilities list is split into 3 pieces, 3 drawoffs could happen at the same timestep. Theoretically, the drawoff list itself could also be split up in pieces, or the drawoff counter from before is kept.
+
+```Python
+water_LperH = [0] * int(365 * 24 * 3600 / s_step)
+drawoffs = [23, 56, 87, 123, 254, 23, 402, 335]
+p_drawoffs = [0.04, 0.13, 0.23, 0.31, 0.41, 0.55, 0.76, 0.97]
+
+
+pieces = 3
+for i in range(pieces):
+    p_drawoffs_i = p_drawoffs[i::3]
+    p_drawoffs_lsts.append(p_drawoffs_i)
+    
+drawoff_count = 0
+
+for p_drawoffs_sublst in p_drawoffs_lsts:
+
+	drawoff_sub_count = 0
+
+    for time_step, p_current_sum in enumerate(p_norm_integral):
+
+        if p_drawoffs_lst[sub_drawoff_count] < p_current_sum:
+            water_LperH[time_step] = drawoffs[drawoff_count]
+            drawoff_sub_count += 1
+            drawoff_count += 1
+
+        if drawoff_sub_count >= len(p_drawoffs_sublst):
+            break
+        
+        if drawoff_count >= len(drawoffs):
+            break
+```
+
+The current method in OpenDHW cal be found [here](https://github.com/jonasgrs/OpenDHW/blob/main/OpenDHW.py#L533).
 
 ## Plotting Timeseries
 
@@ -237,9 +295,10 @@ and 60min:
 
 ## Open Todos:
 
-Generally, the Todos to make OpenDHW truely comparable to DHWcalc are listed as #todo in the main script and the examples. Right now, probably the two biggest tasks are:
+Generally, the Todos to make OpenDHW truely comparable to DHWcalc are listed as #todo in the main script and the examples. Right now, probably the biggest tasks are:
 
 - bringing the number of drawoffs further down to the DHWcalc level
-- improving the placement algorithm, so that it no longer depends on slicing the probabilities of drawoffs. (for more explanation, see [this OpenDHW code](https://github.com/jonasgrs/OpenDHW/blob/main/OpenDHW.py#L533).
+- improving the placement algorithm, so that it no longer depends on slicing the probabilities of drawoffs. (for more explanation, see [this OpenDHW code](https://github.com/jonasgrs/OpenDHW/blob/main/OpenDHW.py#L533). Cant be that hard.
 - researching daily probability profiles for non residential buildings
 - implementing a fixed random seed option, so that the same inputs can always produce the same outputs if needed.
+- contacting [Hagen Braas](https://www.uni-kassel.de/maschinenbau/en/institute/ite/fachgebieteleitung/about-us/team/daten-mitarbeitende/hagen-braas.html) from Uni Kassel, the main developer behind DHWcalc. He also planned to release DHWcalc as a python package, thus cooperation could be fostered here.
