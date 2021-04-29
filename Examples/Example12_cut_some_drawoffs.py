@@ -2,13 +2,13 @@
 import OpenDHW
 
 """
-
+Introduces the 'reduce_no_drawoffs' function.
 """
 
 
 # --- Parameters ---
 s_step = 900
-resample_method = True
+resample_method = False
 mean_drawoff_vol_per_day = 200
 categories = 4
 start_plot = '2019-03-31'

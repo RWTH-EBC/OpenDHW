@@ -16,8 +16,8 @@ For non-residental buildings, the daily probability functions should be
 altered, as there are no typical shower or cooking periods in the morning
 and the evening.
 
-As OpenDHW sometimes doesnt seem to work with s_step != 60, a workaround has 
-been implemented: the 'resample_water_series' function.
+As an alternative for timesteps different from 60seconds, a second method has 
+been implemented in OpenDHW: the 'resample_water_series' function.
 
 The idea is to always generate a timeseries with s_step=60s and then resample it
 afterwards to the desired output stepwidth. The disadvantage is a higher 
@@ -29,7 +29,7 @@ computing time.
 s_step = 60
 resample_method = False
 mean_drawoff_vol_per_day = 200
-categories = 4
+categories = 1
 start_plot = '2019-03-31-06'
 end_plot = '2019-03-31-09'
 temp_dT = 35    # K
@@ -66,20 +66,20 @@ def main():
         temp_dT=temp_dT
     )
 
-    # example timeseries which could be fed into Dymola
+    # example timeseries which could be fed into Dynamic Simulations
     water_series = timeseries_df['Water_L']
     heat_series = timeseries_df['Heat_kWh']
 
     # inspect the drawoff events
-    drawoffs_df = OpenDHW.get_drawoffs(timeseries_df)
-    drawoffs_df2 = timeseries_df[timeseries_df['Water_LperH'] != 0]
+    drawoffs_df = timeseries_df[timeseries_df['Water_LperH'] != 0]
 
     # Generate Histogram from the loaded timeseries
-    OpenDHW.draw_histplot(timeseries_df=timeseries_df, extra_kde=False)
+    OpenDHW.draw_histplot(timeseries_df=timeseries_df, extra_kde=False,
+                          save_fig=True)
 
     # Generate Lineplot from the loaded timeseries
     OpenDHW.draw_lineplot(timeseries_df=timeseries_df, start_plot=start_plot,
-                          end_plot=end_plot)
+                          end_plot=end_plot, save_fig=True)
 
     # Generate detailed Histogram from the loaded timeseries
     OpenDHW.draw_detailed_histplot(timeseries_df=timeseries_df)

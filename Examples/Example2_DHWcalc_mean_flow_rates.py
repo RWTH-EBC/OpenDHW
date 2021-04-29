@@ -13,7 +13,7 @@ for the generation and distribution of the drawoff event.
 # --- Parameters ---
 start_plot = '2019-03-04-06'
 end_plot = '2019-03-04-10'
-categories = 4
+categories = 1
 
 # --- Constants ---
 s_steps = [60, 900, 3600]
@@ -48,8 +48,6 @@ def main():
             end_plot=end_plot,
             plot_hist=False
         )
-
-        pass
 
 
 if __name__ == '__main__':

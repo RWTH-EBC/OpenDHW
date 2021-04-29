@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 import OpenDHW
-import OpenDHW_depreciated_functions as OpenDHW_old
-
 import pandas as pd
-import random
 
 """
 This Example loads multiple TimeSeries at once from a CSV file generated in 
-Example 4. Then the drawoffs are averaged and distributed over a year.
-
-Thus, the drawoff distribution is averaged, not the placement within a year!
+the previous Example.
 """
+# todo: update this example
 
 # ------- Parameter Section ---------
 save_path = '/Users/jonasgrossmann/git_repos/' \

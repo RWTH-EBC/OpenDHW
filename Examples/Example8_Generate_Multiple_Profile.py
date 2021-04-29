@@ -7,6 +7,7 @@ First, a single DHW profile is generated. Then, additional profiles with the
 same settings as the original profile are generated and appended to the main 
 dataframe.
 """
+# todo: update this example.
 
 # --- Parameters ---
 s_step = 600

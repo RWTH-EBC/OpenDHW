@@ -2,13 +2,12 @@
 import OpenDHW
 import OpenDHW_Utilities as Utils
 from pathlib import Path
-from datetime import datetime
 
 """
 This Example loads a timeseris from DHWcalc, computes the corresponding Heat 
 and converts the DHW Timeseries to a Storage Timeseries using the StorageLoad
-function of the Utilities. Does the same for an OpenDHW Timeseries. The two 
-can then be compared.
+function of the Utilities Script. Does the same for an OpenDHW Timeseries. The 
+two can then be compared.
 """
 
 # --- Parameters ---

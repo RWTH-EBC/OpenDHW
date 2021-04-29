@@ -6,8 +6,8 @@ import pandas as pd
 This Example loads multiple TimeSeries from DHWcalc for one category, 
 with different max flow rates.
 
-One can see that the adjusted maximum flow rate results in new seeds 
-for the main gauss curve, but not in the underlying noise distribution. 
+It looks like the adjusted maximum flow rate also results in new seeds 
+for the main gauss curve, but not for drawoffs happening at the same time? 
 """
 
 # --- Parameters ---
