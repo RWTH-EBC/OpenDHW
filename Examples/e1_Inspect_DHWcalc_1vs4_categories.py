@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import OpenDHW
+from OpenDHW import OpenDHW as OpenDHW
 
 """
 This Example load a single TimeSeries from DHWcalc and generates a Histogram 

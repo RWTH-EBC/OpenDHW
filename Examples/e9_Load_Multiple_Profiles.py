@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-import OpenDHW
+import os
+
+from OpenDHW import OpenDHW as OpenDHW
 import pandas as pd
 
 """
@@ -9,14 +11,20 @@ the previous Example.
 # todo: update this example
 
 # ------- Parameter Section ---------
-save_path = '/Users/jonasgrossmann/git_repos/' \
-            'OpenDHW/Saved_Timeseries/OpenDHW_5runs_200L_10min_8LperDrawoff.csv'
 
 start_plot = '2019-01-01'
 end_plot = '2019-01-31'
 
 
 def main():
+
+    this_dir = os.path.dirname(__file__)
+    workspace = os.path.join(this_dir, "workspace")
+    if not os.path.exists(workspace):
+        os.mkdir(workspace)
+
+    save_path = os.path.abspath(
+        os.path.join(workspace, "OpenDHW_5runs_200L_10min_8LperDrawoff.csv"))
 
     # get large run of OpenDHW results from the csv generated in Example 4.
     timeseries_df_study = pd.read_csv(save_path, index_col=0, parse_dates=True)

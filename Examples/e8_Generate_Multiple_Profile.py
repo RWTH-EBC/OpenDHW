@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import OpenDHW
+from OpenDHW import OpenDHW as OpenDHW
 
 """
 This Example generates multiple TimeSeries at once and saves them as a CSV. 

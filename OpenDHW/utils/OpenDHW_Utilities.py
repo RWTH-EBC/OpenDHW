@@ -13,8 +13,10 @@ rwth_orange = "#F6A800"
 rwth_red = "#CC071E"
 
 # Matplotlib Style
-dir_mpl_repo = "/Users/jonasgrossmann/git_repos"
-plt.style.use(dir_mpl_repo + "/matplolib-style/ebc.paper.mplstyle")
+try:
+    plt.style.use("~\\ebc.paper.mplstyle")
+except OSError:
+    pass
 
 
 def convert_dhw_load_to_storage_load(timeseries_df, start_plot, end_plot,

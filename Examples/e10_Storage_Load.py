@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-import OpenDHW
-import OpenDHW_Utilities as Utils
+from OpenDHW import OpenDHW as OpenDHW
+from OpenDHW.utils import OpenDHW_Utilities as Utils
 from pathlib import Path
 
 """

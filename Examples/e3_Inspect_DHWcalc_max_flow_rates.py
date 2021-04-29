@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import OpenDHW
+from OpenDHW import OpenDHW as OpenDHW
 import pandas as pd
 
 """

@@ -1,31 +1,32 @@
 # -*- coding: utf-8 -*-
-import OpenDHW
+from OpenDHW import OpenDHW as OpenDHW
 
 """
-This Example loads DHWcalc Timeseries with different timesteps and compares 
-them to their OpenDHW Equivalent.
+This Example loads DHWcalc Timeseries with different daily water 
+demands and compares them to their OpenDHW Equivalent.
 """
 
 # --- Parameters ---
-s_steps = [60, 600, 900, 3600]
-categories = 1
+daily_demands = [160, 200, 240, 2000]  # 160, 200, 240, 2000
+s_step = 900
+categories = 4
 resample_method = False
-start_plot = '2019-03-04'
-end_plot = '2019-03-08'
+start_plot = '2019-04-05'
+end_plot = '2019-04-07'
+plot_date_slice = False
 
 # --- Constants ---
-mean_drawoff_vol_per_day = 200
 
 
 def main():
 
-    for s_step in s_steps:
+    for daily_demand in daily_demands:
 
         # Load time-series from DHWcalc
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
             categories=categories,
-            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+            mean_drawoff_vol_per_day=daily_demand,
             daylight_saving=False
         )
 
@@ -34,7 +35,7 @@ def main():
             open_dhw_df = OpenDHW.generate_dhw_profile(
                 s_step=s_step,
                 categories=categories,
-                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+                mean_drawoff_vol_per_day=daily_demand,
             )
 
         else:
@@ -43,20 +44,21 @@ def main():
             open_dhw_df = OpenDHW.generate_dhw_profile(
                 s_step=60,
                 categories=categories,
-                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+                mean_drawoff_vol_per_day=daily_demand,
             )
 
             # resample to the desired stepwidth
             open_dhw_df = OpenDHW.resample_water_series(
                 timeseries_df=open_dhw_df, s_step_output=s_step)
 
-        # compare time-series
+        # compare both time-series
         OpenDHW.compare_generators(
             timeseries_df_1=dhwcalc_df,
             timeseries_df_2=open_dhw_df,
             start_plot=start_plot,
             end_plot=end_plot,
-            plot_date_slice=False,
+            plot_date_slice=plot_date_slice,
+            plot_detailed_distribution=True
         )
 
 
