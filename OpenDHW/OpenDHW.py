@@ -881,20 +881,19 @@ def draw_detailed_histplot(timeseries_df):
               'with one drawoff category.')
 
 
-def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
+def add_additional_runs(timeseries_df, total_runs=5, dir_output=None):
     """
     method to add more runs to a timeseries dataframe with the same input
     parameters as the original timeseries.
 
     :param timeseries_df:
     :param total_runs:
-    :param save_to_csv:
+    :param dir_output:
     :return:
     """
     added_runs = total_runs - 1
 
     s_step = int(timeseries_df.index.freqstr[:-1])
-    mean_vol_per_drawoff = timeseries_df['mean_vol_per_drawoff'][0]
     mean_drawoff_vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
     weekend_weekday_factor = timeseries_df['weekend_weekday_factor'][0]
     initial_day = timeseries_df['initial_day'][0]
@@ -902,8 +901,6 @@ def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
     categories = timeseries_df['categories'][0]
 
     if method == 'OpenDHW':
-
-        drawoff_method = timeseries_df['drawoff_method'][0]
 
         for run in range(added_runs):
             extra_timeseries_df = generate_dhw_profile(
@@ -922,18 +919,17 @@ def add_additional_runs(timeseries_df, total_runs=5, save_to_csv=True):
         raise Exception('adding multiple plots for DWHcalc is not so useful, '
                         'as DHWcalc does not work with a random seed!')
 
-    if save_to_csv:
+    if dir_output is not None:
+
         # set a name for the file
-        save_name = "{}_{}runs_{}L_{}min_{}LperDrawoff.csv".format(
-            method, total_runs, mean_drawoff_vol_per_day, int(s_step / 60),
-            mean_vol_per_drawoff)
+        save_name = "{}_{}runs_{}L_{}min.csv".format(
+            method, total_runs, mean_drawoff_vol_per_day, int(s_step / 60))
 
         # make a directory. if it already exists, no problem, just use it
-        save_dir = Path.cwd().parent / "Saved_Timeseries"
-        save_dir.mkdir(exist_ok=True)
+        dir_output.mkdir(exist_ok=True)
 
         # save the dataframe in the folder as a csv with the chosen name
-        timeseries_df.to_csv(save_dir / save_name)
+        timeseries_df.to_csv(dir_output / save_name)
 
     return timeseries_df
 
@@ -943,24 +939,20 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
     get sorted drawoff events from a timeseries Dataframe.
     """
 
-    if col_part != 'all':
-        # only get specific columns
-        col_names = list(timeseries_df.columns)
-        cols_LperH = [name for name in col_names if col_part in name]
-        water_LperH_df = timeseries_df[cols_LperH]
-    else:
-        # the timeseries_df has already been cleaned from unwanted columns
-        water_LperH_df = timeseries_df
-        cols_LperH = list(timeseries_df.columns)
+    # only columns that contain 'Water_LperH'
+    cols_bool_str = timeseries_df.columns.str.contains('Water_LperH')
+    water_LperH_df = timeseries_df.loc[:, cols_bool_str]
 
-    #  generate drawoff Dataframe. initially, it has the same length as the
-    #  timeseries_df. Index Column is not the DatetimeIndex anymore, as values
-    #  in a single row do not correspond to a single Date!
-    drawoffs_df = pd.DataFrame(columns=cols_LperH,
-                               index=range(len(timeseries_df)))
+    # not columns that contrain 'cat'
+    cols_bool_str2 = water_LperH_df.columns.str.contains('cat')
+    cols_bool_str2 = [not i for i in cols_bool_str2]
+    water_LperH_df = water_LperH_df.loc[:, cols_bool_str2]
 
-    for col_name in cols_LperH:
-        #  From each column, get only values > 0.
+    drawoffs_df = water_LperH_df.reset_index(drop=True)
+
+    for col_name in drawoffs_df.columns:
+
+        #  From each column, get only values != 0.
         drawoffs_series = water_LperH_df[water_LperH_df[col_name] != 0][
             col_name]
         drawoffs_lst = list(drawoffs_series)
@@ -971,6 +963,7 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
         drawoffs_lst.extend(empty_cells_lst)
         drawoffs_lst.sort()
 
+        # append to the drawoff dataframe
         drawoffs_df[col_name] = drawoffs_lst
 
     # Drop rows that have only NaN's as values
@@ -979,7 +972,7 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
     return drawoffs_df
 
 
-def plot_multiple_runs(timeseries_df, plot_demands_overlay=False,
+def plot_multiple_runs(timeseries_df, plot_demands_overlay=True,
                        start_plot='2019-02-01', end_plot='2019-02-02',
                        plot_hist=True, plot_kde=True):
     """
@@ -995,12 +988,20 @@ def plot_multiple_runs(timeseries_df, plot_demands_overlay=False,
     """
 
     drawoffs_df = get_drawoffs(timeseries_df=timeseries_df)
-    cols_bool_str = timeseries_df.columns.str.contains('Water_LperH')
-    water_LperH_df = timeseries_df.loc[:, cols_bool_str]
 
     if plot_demands_overlay:
+
         fig, ax1 = plt.subplots()
         fig.tight_layout()
+
+        # only columns that contain 'Water_LperH'
+        cols_bool_str = timeseries_df.columns.str.contains('Water_LperH')
+        water_LperH_df = timeseries_df.loc[:, cols_bool_str]
+
+        # not columns that contrain 'cats'
+        cols_bool_str2 = water_LperH_df.columns.str.contains('cat')
+        cols_bool_str2 = [not i for i in cols_bool_str2]
+        water_LperH_df = water_LperH_df.loc[:, cols_bool_str2]
 
         ax1 = sns.lineplot(ax=ax1, data=water_LperH_df[start_plot:end_plot],
                            linewidth=0.5, legend=False)
@@ -1015,13 +1016,23 @@ def plot_multiple_runs(timeseries_df, plot_demands_overlay=False,
         plt.show()
 
     if plot_hist:
+
         sns.histplot(data=drawoffs_df, kde=False, element="step", fill=False,
                      stat='count', line_kws={'alpha': 0.8, 'linewidth': 0.9})
+
+        title_str = make_title_str(timeseries_df)
+        plt.title(title_str)
+
         plt.show()
 
     if plot_kde:
+
         sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5, fill=False,
-                    linewidth=0.5, legend=False)
+                    linewidth=0.5, legend=True)
+
+        title_str = make_title_str(timeseries_df)
+        plt.title(title_str)
+
         plt.show()
 
 
