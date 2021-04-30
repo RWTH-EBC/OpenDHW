@@ -92,7 +92,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
         mean_vol_per_drawoff = 8  # constant DHWcalc 1 category
         timeseries_df['mean_vol_per_drawoff'] = 8
 
-        mean_drawoff_flow_rate_LperH = mean_vol_per_drawoff * 3600 / s_step  # in L/h
+        mean_drawoff_flow_rate_LperH = mean_vol_per_drawoff * 3600 / s_step
         timeseries_df[
             'mean_drawoff_flow_rate_LperH'] = mean_drawoff_flow_rate_LperH
 
@@ -100,7 +100,8 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
         timeseries_df[
             'sdtdev_drawoff_flow_rate_LperH'] = sdt_dev_drawoff_flow_rate
 
-        mean_no_drawoffs_per_day = mean_drawoff_vol_per_day / mean_vol_per_drawoff
+        mean_no_drawoffs_per_day \
+            = mean_drawoff_vol_per_day / mean_vol_per_drawoff
         timeseries_df['mean_no_drawoffs_per_day'] = mean_no_drawoffs_per_day
 
     return timeseries_df
@@ -529,91 +530,67 @@ def generate_and_distribute_drawoffs(timeseries_df, cats_series):
     p_drawoffs.sort()
     p_norm_integral.sort()
 
-    # --- make sublusts from p_drawoffs.
-    # todo: workaround to solve issue with multiple drawoffs at the same
-    #  timestep, could be solved differently: look for each p_drawoff
-    #  if it falls at a particular timestep, only then go up one timestep.
-    #  Cant be solved with two for-loops, as this would yield a quadratic
-    #  runtime
-    p_drawoffs_lsts = []
-
-    # --- the higher the s_step, the more pieces are needed. ---
-    pieces = int(20 * s_step / 60)
-    pieces = min(pieces, int((len(drawoffs) / 10)))
-    for i in range(pieces):
-        p_drawoffs_i = p_drawoffs[i::pieces]
-        p_drawoffs_lsts.append(p_drawoffs_i)
-
     # --- distribute drawoffs ---
-    drawoff_count = 0
     water_LperH_cat = [0] * int(365 * 24 * 3600 / s_step)
     water_LperH = list(timeseries_df['Water_LperH'])
     max_flow_rate = cats_series['max_flow_rate_per_drawoff_LperH']
 
-    for p_drawoffs_lst in p_drawoffs_lsts:
+    # counter for the drawoffs
+    drawoff_count = 0
 
-        # counter for each sublist of p_drawoffs
-        sub_drawoff_count = 0
+    # loop p_norm_integral and place drawoffs:
+    for time_step, p_current_sum in enumerate(p_norm_integral):
 
-        # loop p_norm_integral and place drawoffs:
-        for time_step, p_current_sum in enumerate(p_norm_integral):
+        # dont place drawoff if timestep has already reached the max flowrate
+        if water_LperH[time_step] >= max_flow_rate:
+            continue
 
-            # dont place a drawoff when the timestep has already reached the
-            # max allowed flowrate
-            if water_LperH[time_step] >= max_flow_rate:
-                continue
+        # if all drawoffs are palced, break the loop.
+        if drawoff_count >= len(drawoffs):
+            break
 
-            # if the looping of p_norm_integral results in surpassing the
-            # current probabily of the chosen drawoff, ot might be placed at
-            # that timestep!
-            if p_drawoffs_lst[sub_drawoff_count] < p_current_sum:
+        # if the looping of p_norm_integral results in surpassing the
+        # probability of the chosen drawoff, that drawoff might be placed at
+        # that timestep!
+        while p_drawoffs[drawoff_count] < p_current_sum:
 
-                # if the drawoff event occupies more than one timestep,
-                # a list (drawoffs_time_step_delta) is placed, rather than a
-                # single number.
-                drawoff = drawoffs[drawoff_count]
-                drawoffs_time_step_delta = [drawoff] * drawoff_steps
+            # if the drawoff event occupies more than one timestep,
+            # a list (drawoffs_time_step_delta) is placed, rather than a
+            # single number.
+            drawoff = drawoffs[drawoff_count]
+            drawoffs_time_step_delta = [drawoff] * drawoff_steps
 
-                # boolean, to count the drawoff events, but not the timesteps
-                # occupied by all drawoffs. this is needed when the drawoff
-                # event occupies more than one timestep
-                drawoff_occured = False
+            # boolean, to count the drawoff events, but not the timesteps
+            # occupied by all drawoffs. this is needed when the drawoff
+            # event occupies more than one timestep.
+            drawoff_occured = True
 
+            for i in range(drawoff_steps):
+
+                # if the added drawoff surpasses the max flowrate in any of
+                # the possible timesteps it would occupy, it should not occur!
+                if water_LperH[time_step + i] + \
+                        drawoffs_time_step_delta[i] > max_flow_rate:
+                    drawoff_occured = False
+                    break
+
+            if drawoff_occured:
                 for i in range(drawoff_steps):
+                    # if the added drawoff would not surpass the max
+                    # flowrate, add it to both return lists! for the
+                    # category, and for the whole list.
+                    water_LperH[time_step + i] \
+                        += drawoffs_time_step_delta[i]
+                    water_LperH_cat[time_step + i] \
+                        += drawoffs_time_step_delta[i]
 
-                    # todo: dont check if one entry of the list might surpass
-                    #  the maximum allowed flowrate, but rather check if any
-                    #  entry of the list surpasses the max flowrate.
-                    #  Otherwise, the drawoff event is split in two parts and
-                    #  the parts lost that surpass the max flowrate.
+                drawoff_count += 1
 
-                    if water_LperH[time_step + i] + \
-                            drawoffs_time_step_delta[i] > max_flow_rate:
-                        drawoff_occured = False
-                    else:
-                        # if the added drawoff would not surpass the max
-                        # flowrate, add it to both return lists! for the
-                        # category, and for the whole house.
-                        water_LperH[time_step + i] \
-                            += drawoffs_time_step_delta[i]
-                        water_LperH_cat[time_step + i] \
-                            += drawoffs_time_step_delta[i]
-                        drawoff_occured = True
+            else:
+                break  # break the while loop.
 
-                if drawoff_occured:
-                    # if drawoff occured, increase the drawoff counter
-                    sub_drawoff_count += 1
-                    drawoff_count += 1
-
-                if sub_drawoff_count >= len(p_drawoffs_lst):
-                    # when the drawoff counter is reached, stop looping over
-                    # the year. (needed? only saves some iterations at the
-                    # end of the year?)
-                    break
-
-                if drawoff_count >= len(drawoffs):
-                    # not necessary anymore?
-                    break
+            if drawoff_count >= len(drawoffs):
+                break
 
     # update the sum of all categories
     timeseries_df['Water_LperH'] = water_LperH
@@ -773,8 +750,7 @@ def draw_histplot(timeseries_df, extra_kde=False, save_fig=False):
     """
 
     # get non-zero values of the profile
-    drawoffs_df = get_drawoffs(timeseries_df=timeseries_df,
-                               col_part='Water_LperH')
+    drawoffs_df = get_drawoffs(timeseries_df=timeseries_df, remove_cats=False)
 
     cats = timeseries_df['categories'][0]
     if cats == 1:
@@ -920,7 +896,6 @@ def add_additional_runs(timeseries_df, total_runs=5, dir_output=None):
                         'as DHWcalc does not work with a random seed!')
 
     if dir_output is not None:
-
         # set a name for the file
         save_name = "{}_{}runs_{}L_{}min.csv".format(
             method, total_runs, mean_drawoff_vol_per_day, int(s_step / 60))
@@ -934,7 +909,7 @@ def add_additional_runs(timeseries_df, total_runs=5, dir_output=None):
     return timeseries_df
 
 
-def get_drawoffs(timeseries_df, col_part='Water_LperH'):
+def get_drawoffs(timeseries_df, remove_cats=True):
     """
     get sorted drawoff events from a timeseries Dataframe.
     """
@@ -943,15 +918,15 @@ def get_drawoffs(timeseries_df, col_part='Water_LperH'):
     cols_bool_str = timeseries_df.columns.str.contains('Water_LperH')
     water_LperH_df = timeseries_df.loc[:, cols_bool_str]
 
-    # not columns that contrain 'cat'
-    cols_bool_str2 = water_LperH_df.columns.str.contains('cat')
-    cols_bool_str2 = [not i for i in cols_bool_str2]
-    water_LperH_df = water_LperH_df.loc[:, cols_bool_str2]
+    if remove_cats:
+        # not columns that contain 'cat'
+        cols_bool_str2 = water_LperH_df.columns.str.contains('cat')
+        cols_bool_str2 = [not i for i in cols_bool_str2]
+        water_LperH_df = water_LperH_df.loc[:, cols_bool_str2]
 
     drawoffs_df = water_LperH_df.reset_index(drop=True)
 
     for col_name in drawoffs_df.columns:
-
         #  From each column, get only values != 0.
         drawoffs_series = water_LperH_df[water_LperH_df[col_name] != 0][
             col_name]
@@ -990,7 +965,6 @@ def plot_multiple_runs(timeseries_df, plot_demands_overlay=True,
     drawoffs_df = get_drawoffs(timeseries_df=timeseries_df)
 
     if plot_demands_overlay:
-
         fig, ax1 = plt.subplots()
         fig.tight_layout()
 
@@ -1016,7 +990,6 @@ def plot_multiple_runs(timeseries_df, plot_demands_overlay=True,
         plt.show()
 
     if plot_hist:
-
         sns.histplot(data=drawoffs_df, kde=False, element="step", fill=False,
                      stat='count', line_kws={'alpha': 0.8, 'linewidth': 0.9})
 
@@ -1026,7 +999,6 @@ def plot_multiple_runs(timeseries_df, plot_demands_overlay=True,
         plt.show()
 
     if plot_kde:
-
         sns.kdeplot(data=drawoffs_df, bw_adjust=0.1, alpha=0.5, fill=False,
                     linewidth=0.5, legend=True)
 
@@ -1069,7 +1041,7 @@ def plot_multiple_timeseries(timeseries_lst, col_part='Water_LperH',
         # fill the plot dataframe with the matching column
         plot_df[i] = df[cols_LperH]
 
-    drawoffs_df = get_drawoffs(timeseries_df=plot_df, col_part='all')
+    drawoffs_df = get_drawoffs(timeseries_df=plot_df)
 
     if plot_demands_overlay:
         fig, ax1 = plt.subplots()
@@ -1236,7 +1208,6 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         if save_fig:
             dir_output = Path.cwd() / "plots"
             dir_output.mkdir(exist_ok=True)
-
 
             fname = "Timeseries_Comparison_Histplot"
             fig.savefig(dir_output / (fname + '.pdf'))
@@ -1491,19 +1462,18 @@ def make_title_str(timeseries_df):
                 cats_str += '{:.0f} L, '.format(cat_sum)
             cats_str = cats_str[:-2]
 
-            title_str = '{}, ∆t = {}, No. Drawoffs = {}, Peak = {:.1f} L/h ' \
-                        '\n Yearly Demand = {:.0f} L (= {})'.format(
-                method, s_step, len(drawoffs), max_water_flow,
-                yearly_water_demand, cats_str)
+            title_str = f'{method}, ∆t = {s_step}, No. Drawoffs =' \
+                        f' {len(drawoffs)}, Peak = {max_water_flow:.1f} L/h ' \
+                        f'\n Yearly Demand = {yearly_water_demand:.0f} L (=' \
+                        f' {cats_str})'
 
         elif 'DHWcalc' in method:
 
             method = "{} ({} cats)".format(method, cats)
 
-            title_str = '{}, ∆t = {}, No. Drawoffs = {}, Peak = {:.1f} L/h ' \
-                        '\n Yearly Demand = {:.0f} L'.format(
-                method, s_step, len(drawoffs), max_water_flow,
-                yearly_water_demand)
+            title_str = f"{method}, ∆t = {s_step}, No. Drawoffs =" \
+                        f" {len(drawoffs)}, Peak = {max_water_flow:.1f} L/h " \
+                        f"\n Yearly Demand = {yearly_water_demand:.0f} L"
 
         else:
             raise Exception("Unkown method, try 'OpenDHW' or 'DHWcalc'.")
@@ -1588,7 +1558,7 @@ def reduce_no_drawoffs(timeseries_df):
     In case the yearly water demand is higher in an OpenDHW timeseries than
     the expected one, this function removes some randomly selected drawoffs
     events with a small flowrate to reduce the yearly water demand until its
-    just under the expected one and simultanieously decreasing the number of
+    just under the expected one and simultaneously decreasing the number of
     drawoffs.
 
     :param timeseries_df:           df: input dataframe
