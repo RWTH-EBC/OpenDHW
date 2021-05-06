@@ -1,3 +1,56 @@
+# Python compiled files #
+#########################
+*.pyc
+*.orig
+
+# temporary files for calculation #
+#########################
+
+
+# temporary boundary condition files #
+######################################
+
+
+# Output-Files #
+########################
+/teaser/OutputData/
+
+#Eclipse Settings #
+#####################
+/.settings
+.project
+.pydevproject
+
+#Spyder Settings #
+#####################
+.spyderproject
+
+#PyCharm Settings #
+#####################
+.idea
+
+#Unit tests #
+#####################
+.cache/
+__pycache__/
+.coverage
+.pytest_cache
+
+#pip install #
+#####################
+*.egg-info/
+*.egg/
+*.eggs
+dist
+*.pypirc
+
+#ignore docs#
+#####################
+
+doc/_build
+
+
+
 Examples/plots/*
 
-*.egg-info
+Saved_Timeseries/
