@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from OpenDHW import OpenDHW as OpenDHW
+import OpenDHW
 
 """
 This example shows that the table in DHWcalc when choosing 4 categories can 

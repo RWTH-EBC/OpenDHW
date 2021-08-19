@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from OpenDHW import OpenDHW as OpenDHW
+import OpenDHW
 
 """
 This example is a final test of OpenDHW.

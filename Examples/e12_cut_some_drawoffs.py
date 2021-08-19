@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from OpenDHW import OpenDHW as OpenDHW
+import OpenDHW
 
 """
 Introduces the 'reduce_no_drawoffs' function.
