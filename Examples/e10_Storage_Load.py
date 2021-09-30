@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from OpenDHW import OpenDHW as OpenDHW
+import OpenDHW
 from OpenDHW.utils import OpenDHW_Utilities as Utils
 from pathlib import Path
 

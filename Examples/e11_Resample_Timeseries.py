@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from OpenDHW import OpenDHW as OpenDHW
+import OpenDHW
 
 """
 Resampling a base timestep of 60S yields different distributions compared to 
