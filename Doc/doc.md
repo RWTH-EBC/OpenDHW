@@ -319,4 +319,3 @@ Generally, the Todos to make OpenDHW truly comparable to DHWcalc are listed as #
 - improving the placement algorithm, so that it no longer depends on slicing the probabilities of drawoffs. (for more explanation, see [this OpenDHW code](https://github.com/jonasgrs/OpenDHW/blob/main/OpenDHW.py#L533). Cant be that hard.
 - researching daily probability profiles for non residential buildings
 - implementing a fixed random seed option, so that the same inputs can always produce the same outputs if needed.
-- contacting [Hagen Braas](https://www.uni-kassel.de/maschinenbau/en/institute/ite/fachgebieteleitung/about-us/team/daten-mitarbeitende/hagen-braas.html) from Uni Kassel, the main developer behind DHWcalc. He also planned to release DHWcalc as a python package, thus cooperation could be fostered here.
