@@ -40,6 +40,7 @@ def main():
                     open_dhw_df = OpenDHW.generate_dhw_profile(
                         s_step=s_step,
                         categories=categories,
+                        holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
                         mean_drawoff_vol_per_day=daily_demand,
                     )
 
@@ -49,6 +50,7 @@ def main():
                     open_dhw_df = OpenDHW.generate_dhw_profile(
                         s_step=60,
                         categories=categories,
+                        holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
                         mean_drawoff_vol_per_day=daily_demand,
                     )
 

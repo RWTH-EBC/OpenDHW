@@ -25,11 +25,15 @@ def main():
     timeseries_df = OpenDHW.generate_dhw_profile(
         s_step=s_step,
         categories=categories,
+        holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
 
     timeseries_df = OpenDHW.add_additional_runs(
-        timeseries_df=timeseries_df, total_runs=runs, dir_output=dir_output)
+        timeseries_df=timeseries_df,
+        total_runs=runs,
+        holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
+        dir_output=dir_output)
 
 
 if __name__ == '__main__':

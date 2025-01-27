@@ -107,8 +107,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
     return timeseries_df
 
 
-def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
-                         mean_drawoff_vol_per_day=200, initial_day=0):
+def generate_dhw_profile(s_step, categories, holidays, mean_drawoff_vol_per_day=200,  weekend_weekday_factor=1.2, initial_day=0):
     """
     Generates a DHW profile. The generation is split up in different
     functions and generally follows the methodology described in the DHWcalc
@@ -133,14 +132,15 @@ def generate_dhw_profile(s_step, categories, weekend_weekday_factor=1.2,
     cats_df = get_data_drawoff_categories(
         s_step=s_step,
         categories=categories,
-        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
+        mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
 
     # --- deterministic function
     timeseries_df = generate_yearly_probability_profile(
         s_step=s_step,
-        weekend_weekday_factor=1.2,
-        initial_day=0
+        weekend_weekday_factor=weekend_weekday_factor,
+        holidays = holidays,
+        initial_day=0,
     )
 
     # --- empty drawoffs list, will be filled afterwards
@@ -170,7 +170,7 @@ def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
     a simplified datafarme is returned.
 
     :param s_step:                      int:    seconds in a timestep. f.e 900
-    :param categories:                  int:    1 or 4, see DHWcalc
+    :param categories:                  int:    1 or 4, 1: short laod (washing hands, etc.), 2: medium load (dish-washer, etc.), 3: bath, 4:shower (see DHWcalc)
     :param mean_drawoff_vol_per_day:    int:    volume per day used in house
     :return: cats_df:                   df:     Categores Data
     """
@@ -178,8 +178,7 @@ def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
         cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [60, 360, 840, 480],
                         'drawoff_duration_min': [1, 1, 10, 5],
                         'portion': [0.14, 0.36, 0.1, 0.4],
-                        'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12,
-                                                               24],
+                        'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12, 24],
                         'min_flow_rate_per_drawoff_LperH': [1, 1, 1, 1]
                         }
 
@@ -223,8 +222,7 @@ def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
         cats_df['mean_flow_rate_per_drawoff_LperH'] \
         / 60 * cats_df['drawoff_duration_min']
 
-    cats_df['mean_vol_per_day'] = mean_drawoff_vol_per_day * cats_df[
-        'portion']
+    cats_df['mean_vol_per_day'] = mean_drawoff_vol_per_day * cats_df['portion']
 
     cats_df['mean_vol_per_year'] = cats_df['mean_vol_per_day'] * 365
 
@@ -239,7 +237,6 @@ def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
         = max(cats_df['mean_flow_rate_per_drawoff_LperH'].max(), 1200)
 
     return cats_df
-
 
 def generate_daily_probability_step_function(mode, s_step, save_fig=False,
                                              test_concentrated_ps=False):
@@ -262,30 +259,30 @@ def generate_daily_probability_step_function(mode, s_step, save_fig=False,
     #  during the night?
 
     if s_step <= 1800:
-        if mode == 'weekday':
+        if mode == 'work-day':
             steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
                             (5, 0.06), (4, 0.2), (2, 0.01)]
 
-        elif mode == 'weekend':
+        elif mode == 'off-day':
             steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
                             (3, 0.036), (3, 0.143), (1, 0.018)]
 
         else:
-            raise Exception('Unknown Mode. Please Choose "Weekday" or '
-                            '"Weekend".')
+            raise Exception('Unknown Mode. Please Choose "work-day" or '
+                            '"off-day".')
     else:
         # no more half-hourly steps
-        if mode == 'weekday':
+        if mode == 'work-day':
             steps_and_ps = [(7, 0.01), (1, 0.5), (4, 0.06), (1, 0.16),
                             (5, 0.06), (4, 0.2), (2, 0.01)]
 
-        elif mode == 'weekend':
+        elif mode == 'off-day':
             steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
                             (3, 0.036), (3, 0.143), (1, 0.018)]
 
         else:
-            raise Exception('Unknown Mode. Please Choose "Weekday" or '
-                            '"Weekend".')
+            raise Exception('Unknown Mode. Please Choose "work-day" or '
+                            '"off-day".')
 
     if test_concentrated_ps:
         # just as a test, if p is very concentrated, only 2 hours in the morning
@@ -320,7 +317,7 @@ def generate_daily_probability_step_function(mode, s_step, save_fig=False,
     return p_day
 
 
-def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
+def generate_yearly_probability_profile(s_step, holidays, weekend_weekday_factor=1.2,
                                         initial_day=0):
     """
     generate a summed yearly probability profile. The whole function is
@@ -341,28 +338,29 @@ def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
 
     # load daily probabilities (deterministic)
     p_we = generate_daily_probability_step_function(
-        mode='weekend',
-        s_step=s_step
+        mode='off-day',
+        s_step=s_step,
     )
 
     p_wd = generate_daily_probability_step_function(
-        mode='weekday',
-        s_step=s_step
+        mode='work-day',
+        s_step=s_step,
     )
 
     # shift towards weekend (deterministic)
     p_wd_weighted, p_we_weighted, av_p_week_weighted = shift_weekend_weekday(
-        p_weekday=p_wd,
-        p_weekend=p_we,
+        p_work_day=p_wd,
+        p_off_day=p_we,
         factor=weekend_weekday_factor
     )
 
     # yearly curve (deterministic)
     p_final = generate_yearly_probabilities(
         initial_day=initial_day,
-        p_weekend=p_we_weighted,
-        p_weekday=p_wd_weighted,
-        s_step=s_step
+        p_off_day=p_we_weighted,
+        p_work_day=p_wd_weighted,
+        s_step=s_step,
+        holidays=holidays,
     )
 
     # sum and normalize to range between 0 and 1.
@@ -379,15 +377,15 @@ def generate_yearly_probability_profile(s_step, weekend_weekday_factor=1.2,
     return timeseries_df
 
 
-def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
+def shift_weekend_weekday(p_work_day, p_off_day, factor):
     """
     Shifts the probabilities between the weekday list and the weekend list by a
     defined factor. If the factor is bigger than 1, the probability on the
     weekend is increased. If its smaller than 1, the probability on the
     weekend is decreased.
 
-    :param p_weekday:   list:   probabilities for 1 day of the week [0...1]
-    :param p_weekend:   list:   probabilities for 1 day of the weekend [0...1]
+    :param p_work_day:   list:   probabilities for 1 work day of the week [0...1]
+    :param p_off_day:   list:   probabilities for 1 off day of the week [0...1]
     :param factor:      float:  factor to shift the probabilities between
                                 weekdays and weekend-days
     :return:
@@ -398,8 +396,8 @@ def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
 
     assert p_wd_factor * 5 / 7 + p_we_factor * 2 / 7 == 1
 
-    p_wd_weighted = [p * p_we_factor for p in p_weekday]
-    p_we_weighted = [p * p_we_factor for p in p_weekend]
+    p_wd_weighted = [p * p_we_factor for p in p_work_day]
+    p_we_weighted = [p * p_we_factor for p in p_off_day]
 
     av_p_wd_weighted = statistics.mean(p_wd_weighted)
     av_p_we_weighted = statistics.mean(p_we_weighted)
@@ -409,17 +407,17 @@ def shift_weekend_weekday(p_weekday, p_weekend, factor=1.2):
     return p_wd_weighted, p_we_weighted, av_p_week_weighted
 
 
-def generate_yearly_probabilities(initial_day, p_weekend, p_weekday,
-                                  s_step, plot_p_yearly=False):
+def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
+                                  s_step, holidays, plot_p_yearly=False):
     """
-    Takes the probabilities of a weekday and a weekendday and generates a
+    Takes the probabilities of a working days and a off days and generates a
     list of yearly probabilities by adding a seasonal probability factor.
     The seasonal factor is a sine-function, like in DHWcalc.
 
     :param initial_day:     int:    0: Mon, 1: Tue, 2: Wed, 3: Thur, 4: Fri,
                                     5 : Sat, 6 : Sun
-    :param p_weekend:       list:   probabilities of a weekend day
-    :param p_weekday:       list:   probabilities of a weekday
+    :param p_off_day:       list:   probabilities of an off day
+    :param p_work_day:       list:   probabilities of a working day
     :param s_step:          int:    seconds within a timestep
     :param plot_p_yearly:   bool:   plot the yearly probabilities
 
@@ -431,11 +429,11 @@ def generate_yearly_probabilities(initial_day, p_weekend, p_weekday,
 
     for day in range(365):
 
-        # Is the current day on a weekend?
-        if (day + initial_day) % 7 >= 5:
-            p_day = p_weekend
+        # Define if the day is a working day or not
+        if (day + initial_day) % 7 in (0, 6) or (day + initial_day) in holidays:
+            p_day = p_off_day
         else:
-            p_day = p_weekday
+            p_day = p_work_day
 
         # Compute seasonal factor
         arg = math.pi * (2 / 365 * day - 1 / 4)
@@ -516,7 +514,7 @@ def generate_and_distribute_drawoffs(timeseries_df, cats_series):
         drawoff = generate_single_drawoff_inside_boundaries(cats_series, s_step)
         drawoffs.append(drawoff)
 
-        drawoff_L = drawoff / 3600 * s_step * drawoff_steps
+        drawoff_L = drawoff / 3600 * s_step * drawoff_steps    # L
         V_curr += drawoff_L
 
     # --- generate a probability for each drawoff ---
@@ -552,6 +550,9 @@ def generate_and_distribute_drawoffs(timeseries_df, cats_series):
         # if the looping of p_norm_integral results in surpassing the
         # probability of the chosen drawoff, that drawoff might be placed at
         # that timestep!
+        # This while loop allows for the possibility that two draw-offs from the same
+        # category can be added together at the same timestep if two consecutive elements
+        # (or even more) of p_drawoffs are lower than p_current_sum at this timestep.
         while p_drawoffs[drawoff_count] < p_current_sum:
 
             # if the drawoff event occupies more than one timestep,
@@ -645,14 +646,13 @@ def generate_single_drawoff_inside_boundaries(cats_series, s_step):
     return drawoff  # in L/h
 
 
-def compute_heat(timeseries_df, temp_dT=35):
+def compute_heat(timeseries_df, temp_dT):
     """
     Add heat columns to the timeseries
 
     :param timeseries_df:   df:     Pandas Dataframe with all the timeseries
     :param temp_dT:         int:    temperature difference between freshwater
-                                    and average DHW outlet temperature. F.e.
-                                    35°C.
+                                    and average DHW outlet temperature.
 
     :return: timeseries_df: df:     Dataframe with added 'Heat' Column
     """
@@ -857,7 +857,7 @@ def draw_detailed_histplot(timeseries_df):
               'with one drawoff category.')
 
 
-def add_additional_runs(timeseries_df, total_runs=5, dir_output=None):
+def add_additional_runs(timeseries_df, holidays, total_runs=5, dir_output=None):
     """
     method to add more runs to a timeseries dataframe with the same input
     parameters as the original timeseries.
@@ -882,6 +882,7 @@ def add_additional_runs(timeseries_df, total_runs=5, dir_output=None):
             extra_timeseries_df = generate_dhw_profile(
                 s_step=s_step,
                 categories=categories,
+                holidays=holidays,
                 weekend_weekday_factor=weekend_weekday_factor,
                 mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
                 initial_day=initial_day
@@ -915,6 +916,7 @@ def get_drawoffs(timeseries_df, remove_cats=True):
     """
 
     # only columns that contain 'Water_LperH'
+    timeseries_df.columns = timeseries_df.columns.astype(str)
     cols_bool_str = timeseries_df.columns.str.contains('Water_LperH')
     water_LperH_df = timeseries_df.loc[:, cols_bool_str]
 
