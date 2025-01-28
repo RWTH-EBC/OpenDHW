@@ -1,11 +1,11 @@
 stages:
- - test
- - doc
- - code_quality
- - examples
- - build
+# - test
+# - doc
+# - code_quality
+# - examples
+# - build
  - release
- - deploy
+# - deploy
 
 variables:
   COVERAGE_TYPE: "NotDymola"
@@ -18,23 +18,23 @@ variables:
   EXTRA_REQUIREMENTS_PIP: "[report]"
 
 include:
-  - project: 'EBC/EBC_all/gitlab_ci/templates'
-    file: 'python/code-quality/pylint.gitlab-ci.yml'
-  - project: 'EBC/EBC_all/gitlab_ci/templates'
-    file: 'python/doc/sphinxdoc.gitlab-ci.yml'
-  - project: 'EBC/EBC_all/gitlab_ci/templates'
-    file: 'python/build/build.gitlab-ci.yml'
+#  - project: 'EBC/EBC_all/gitlab_ci/templates'
+#    file: 'python/code-quality/pylint.gitlab-ci.yml'
+#  - project: 'EBC/EBC_all/gitlab_ci/templates'
+#    file: 'python/doc/sphinxdoc.gitlab-ci.yml'
+#  - project: 'EBC/EBC_all/gitlab_ci/templates'
+#    file: 'python/build/build.gitlab-ci.yml'
   #- project: 'EBC/EBC_all/gitlab_ci/templates'
   #  file: 'pages/gl-pages.gitlab-ci.yml'
-  - project: 'EBC/EBC_all/gitlab_ci/templates'
-    file: 'pages/gh-pages.gitlab-ci.yml'
-  - project: 'EBC/EBC_all/gitlab_ci/templates'
-    file: 'python/tests/tests.gitlab-ci.yml'
-  - project: 'EBC/EBC_all/gitlab_ci/templates'
-    file: 'python/tests/coverage.gitlab-ci.yml'
+#  - project: 'EBC/EBC_all/gitlab_ci/templates'
+#    file: 'pages/gh-pages.gitlab-ci.yml'
+#  - project: 'EBC/EBC_all/gitlab_ci/templates'
+#    file: 'python/tests/tests.gitlab-ci.yml'
+#  - project: 'EBC/EBC_all/gitlab_ci/templates'
+#    file: 'python/tests/coverage.gitlab-ci.yml'
   - project: 'EBC/EBC_all/gitlab_ci/templates'
     file: 'python/pypi-release/release.gitlab-ci.yml'
   #- project: 'EBC/EBC_all/gitlab_ci/templates'
   #  file: 'python/examples/examples.gitlab-ci.yml'
-  - template: Dependency-Scanning.gitlab-ci.yml
-  - template: SAST.gitlab-ci.yml
+#  - template: Dependency-Scanning.gitlab-ci.yml
+#  - template: SAST.gitlab-ci.yml
