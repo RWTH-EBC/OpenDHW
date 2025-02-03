@@ -10,13 +10,14 @@ One can see very different distributions for all settings.
 """
 
 # --- Parameters ---
-s_steps = [60, 360, 600, 900, 3600]
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
 draw_lineplot = False   # does not really add insights here
 
 # --- Constants ---
-mean_drawoff_vol_per_day = 200
+s_steps = [60, 360, 600, 900, 3600]
+mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
+occupancy = 5 # Number of occupants in the building
 
 
 def main():
@@ -27,6 +28,7 @@ def main():
         timeseries_1cat_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
             categories=1,
+            occupancy=occupancy,
             mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
             daylight_saving=False)
 
@@ -46,6 +48,7 @@ def main():
         timeseries_4cat_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
             categories=4,
+            occupancy=occupancy,
             mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
             daylight_saving=False)
 

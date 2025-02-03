@@ -13,11 +13,12 @@ for the generation and distribution of the drawoff event.
 # --- Parameters ---
 start_plot = '2019-03-04-06'
 end_plot = '2019-03-04-10'
-categories = 1
 
 # --- Constants ---
+categories = 1
 s_steps = [60, 900, 3600]
-mean_drawoff_vols_per_day = [197, 198, 199, 200, 201, 202, 203]
+mean_drawoff_vols_per_day = [39.4, 39.6, 39.8, 40, 40.2, 40.4, 40.6]
+occupancy = 5
 
 
 def main():
@@ -33,6 +34,7 @@ def main():
             # Load time-series from DHWcalc
             dhwcalc_df = OpenDHW.import_from_dhwcalc(
                 s_step=s_step,
+                occupancy=occupancy,
                 daylight_saving=False,
                 categories=categories,
                 mean_drawoff_vol_per_day=mean_drawoff_vol_per_day

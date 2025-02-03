@@ -17,7 +17,8 @@ end_plot = '2019-03-04-10'
 # --- Constants ---
 s_step = 60
 max_flowrates = [1188, 1194, 1200, 1206, 1212]
-
+mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
+occupancy = 5
 
 def main():
 
@@ -30,9 +31,11 @@ def main():
         # Load time-series from DHWcalc
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
+            occupancy=occupancy,
             daylight_saving=False,
             categories=1,
-            max_flowrate=max_flowrate
+            max_flowrate=max_flowrate,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
         )
 
         timeseries_lst.append(dhwcalc_df)

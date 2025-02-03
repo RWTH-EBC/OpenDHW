@@ -35,8 +35,8 @@ rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
 cp = 4180  # J/kgK
 
 
-def import_from_dhwcalc(s_step, daylight_saving, categories,
-                        mean_drawoff_vol_per_day=200, max_flowrate=1200):
+def import_from_dhwcalc(s_step, daylight_saving, categories,occupancy,
+                        mean_drawoff_vol_per_day, max_flowrate=1200):
     """
     DHWcalc yields Volume Flow TimeSeries (in Liters per hour).
 
@@ -48,6 +48,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
 
     :return timeseries_df:              df:     dataframe that holds the data
     """
+    mean_drawoff_vol_per_day *= occupancy
 
     if daylight_saving:
         ds_string = 'ds'
@@ -56,7 +57,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
 
     # --- DHWcalc result files, saved in the OpenDHW Package
     dhw_file = "{vol}L_{s_step}min_{cats}cat_sf_{ds}_max{max_flow}.txt".format(
-        vol=mean_drawoff_vol_per_day,
+        vol=int(mean_drawoff_vol_per_day),
         s_step=int(s_step / 60),
         cats=categories,
         ds=ds_string,
@@ -107,7 +108,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,
     return timeseries_df
 
 
-def generate_dhw_profile(s_step, categories, holidays, mean_drawoff_vol_per_day=200,  weekend_weekday_factor=1.2, initial_day=0):
+def generate_dhw_profile(s_step, categories, mean_drawoff_vol_per_day, occupancy, holidays, building_type,  weekend_weekday_factor, initial_day=0):
     """
     Generates a DHW profile. The generation is split up in different
     functions and generally follows the methodology described in the DHWcalc
@@ -122,17 +123,20 @@ def generate_dhw_profile(s_step, categories, holidays, mean_drawoff_vol_per_day=
     :param s_step:                      int:    timestep width in seconds.
     :param categories:                  int:    1 or 4 (see DHWcalc)
     :param weekend_weekday_factor:      int:    taken from DHWcalc
-    :param mean_drawoff_vol_per_day:    int:    function of number of people in
-                                                the house of floor area.
+    :param mean_drawoff_vol_per_day:    int:    daily water demand in Liters
     :param initial_day:                 int:    0:Mon - 1:Tues ... 6:Sun
     :return: timeseries_df              df:     dataframe with all timeseries
     """
 
+    mean_drawoff_vol_per_day *= occupancy
+
     # --- holds statistic info about the drawoffs
+
     cats_df = get_data_drawoff_categories(
         s_step=s_step,
         categories=categories,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        building_type=building_type
     )
 
     # --- deterministic function
@@ -141,6 +145,7 @@ def generate_dhw_profile(s_step, categories, holidays, mean_drawoff_vol_per_day=
         weekend_weekday_factor=weekend_weekday_factor,
         holidays = holidays,
         initial_day=0,
+        building_type=building_type
     )
 
     # --- empty drawoffs list, will be filled afterwards
@@ -164,7 +169,7 @@ def generate_dhw_profile(s_step, categories, holidays, mean_drawoff_vol_per_day=
     return timeseries_df
 
 
-def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
+def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day, building_type):
     """
     Get some data for each drawoff category. If only one category is chosen,
     a simplified datafarme is returned.
@@ -174,31 +179,46 @@ def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
     :param mean_drawoff_vol_per_day:    int:    volume per day used in house
     :return: cats_df:                   df:     Categores Data
     """
-    if categories == 4:
-        cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [60, 360, 840, 480],
-                        'drawoff_duration_min': [1, 1, 10, 5],
-                        'portion': [0.14, 0.36, 0.1, 0.4],
-                        'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12, 24],
-                        'min_flow_rate_per_drawoff_LperH': [1, 1, 1, 1]
-                        }
+    if building_type in {"SFH", "TH", "MFH", "AB"}:
 
-        cats_df = pd.DataFrame(data=cats_data_60)
+        if categories == 4:
+            cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [60, 360, 840, 480],
+                            'drawoff_duration_min': [1, 1, 10, 5],
+                            'portion': [0.14, 0.36, 0.1, 0.4],
+                            'stddev_flow_rate_per_drawoff_LperH': [120, 120, 12,24],
+                            'min_flow_rate_per_drawoff_LperH': [1, 1, 1, 1]
+                            }
+
+            cats_df = pd.DataFrame(data=cats_data_60)
+            # sort by duration distributes long drawoff types first.
+            cats_df.sort_values(by=['drawoff_duration_min'], ascending=False,
+                                inplace=True)
+
+        elif categories == 1:
+            cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [480],
+                            'drawoff_duration_min': [1],
+                            'portion': [1],
+                            'stddev_flow_rate_per_drawoff_LperH': [120],
+                            'min_flow_rate_per_drawoff_LperH': [6]
+                            }
+
+            cats_df = pd.DataFrame(data=cats_data_60)
+        else:
+            raise Exception('unkown number of categories')
+
+
+    else:
+        cats_data = {'mean_flow_rate_per_drawoff_LperH': [100, 360],
+                     'drawoff_duration_min': [1, 1],
+                     'portion': [0.28, 0.72],
+                     'stddev_flow_rate_per_drawoff_LperH': [200, 240],
+                     'min_flow_rate_per_drawoff_LperH': [1, 1]
+                     }
+
+        cats_df = pd.DataFrame(data=cats_data)
         # sort by duration distributes long drawoff types first.
-        # todo: second sort by portion, biggest portion distributed first
         cats_df.sort_values(by=['drawoff_duration_min'], ascending=False,
                             inplace=True)
-
-    elif categories == 1:
-        cats_data_60 = {'mean_flow_rate_per_drawoff_LperH': [480],
-                        'drawoff_duration_min': [1],
-                        'portion': [1],
-                        'stddev_flow_rate_per_drawoff_LperH': [120],
-                        'min_flow_rate_per_drawoff_LperH': [6]
-                        }
-
-        cats_df = pd.DataFrame(data=cats_data_60)
-    else:
-        raise Exception('unkown number of categories')
 
     # if DHWcalc uses 4 categories with a timestep other than 60s,
     # the drawoffs data has to be altered.
@@ -232,67 +252,161 @@ def get_data_drawoff_categories(s_step, categories, mean_drawoff_vol_per_day):
     cats_df['mean_no_drawoffs_per_year'] = \
         cats_df['mean_no_drawoffs_per_day'] * 365
 
-    # add max flow rate: Max(1200, highest category mean flow rate)
-    cats_df['max_flow_rate_per_drawoff_LperH'] \
-        = max(cats_df['mean_flow_rate_per_drawoff_LperH'].max(), 1200)
+
+    if building_type in {"SFH", "TH", "MFH", "AB"}:
+
+        # add max flow rate: Max(1200, highest category mean flow rate)
+        cats_df['max_flow_rate_per_drawoff_LperH'] \
+            = max(cats_df['mean_flow_rate_per_drawoff_LperH'].max(), 1200)
+
+    else:
+        # add max flow rate: Max(1600, highest category mean flow rate)
+        cats_df['max_flow_rate_per_drawoff_LperH'] \
+            = max(cats_df['mean_flow_rate_per_drawoff_LperH'].max(), 1600)
 
     return cats_df
 
-def generate_daily_probability_step_function(mode, s_step, save_fig=False,
+def generate_daily_probability_step_function(mode, s_step,building_type, save_fig=False,
                                              test_concentrated_ps=False):
     """
     Generates probabilities for a day with 6 periods. Corresponds to the mode
-    "step function for weekdays and weekends" in DHWcalc and uses the same
+    "step function for working days and off days" in DHWcalc and uses the same
     standard values. Each Day starts at 0:00. Steps in hours. Sum of steps
     has to be 24. Sum of probabilities has to be 1.
 
     :param test_concentrated_ps:    bool:   different probabilities,
                                             very concentrated in the morning
-    :param mode:                    string: weekday or weekend day
+    :param mode:                    string: working day or off day
     :param s_step:                  int:    seconds within a timestep
     :param save_fig:                Bool:   plot the probability distribution
     :return: p_day                  list:   distribution for one day.
     """
 
-    # todo: add profiles for non-residential buildings, no more heavy periods
-    #  in the morning and evening? different for every industry type? more
-    #  during the night?
+    if building_type in {"SFH", "TH", "MFH", "AB"}:
 
-    if s_step <= 1800:
+        if s_step <= 1800:
+            if mode == 'work-day':
+                steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
+                                (5, 0.06), (4, 0.2), (2, 0.01)]
+
+            elif mode == 'off-day':
+                steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
+                                (3, 0.036), (3, 0.143), (1, 0.018)]
+
+            else:
+                raise Exception('Unknown Mode. Please Choose "work-day" or '
+                                '"off-day".')
+        else:
+            # no more half-hourly steps
+            if mode == 'work-day':
+                steps_and_ps = [(7, 0.01), (1, 0.5), (4, 0.06), (1, 0.16),
+                                (5, 0.06), (4, 0.2), (2, 0.01)]
+
+            elif mode == 'off-day':
+                steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
+                                (3, 0.036), (3, 0.143), (1, 0.018)]
+
+            else:
+                raise Exception('Unknown Mode. Please Choose "work-day" or '
+                                '"off-day".')
+
+        if test_concentrated_ps:
+            # just as a test, if p is very concentrated, only 2 hours in the morning
+            steps_and_ps = [(7, 0), (2, 1), (15, 0)]
+
+        ps = [tup[1] for tup in steps_and_ps]
+        assert sum(ps) == 1
+
+
+    elif building_type == "OB":
         if mode == 'work-day':
-            steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
-                            (5, 0.06), (4, 0.2), (2, 0.01)]
+            # Define the profile based on the "work-day" schedule.
+            # This profile follows the "people profile" described in the SIA Standard-Nutzungsbedingungen
+            # für die Energie- und Gebäudetechnik (Merkblatt 2024) with adjustments.
+
+            steps_and_ps = [
+                (7, 0),
+                (1, 0.04 / 8.4),
+                (1, 0.19 / 8.4),
+                (1, 0.59 / 8.4),
+                (6, 5.93 / 8.4),
+                (1, 0.79 / 8.4),
+                (1, 0.59 / 8.4),
+                (1, 0.19 / 8.4),
+                (1, 0.04 / 8.4),
+                (1, 0.04 / 8.4),
+                (3, 0)
+            ]
 
         elif mode == 'off-day':
-            steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
-                            (3, 0.036), (3, 0.143), (1, 0.018)]
+            # Define the profile for an "off-day," where no significant activity occurs for 24 hours.
+            steps_and_ps = [(24, 0)]
 
         else:
-            raise Exception('Unknown Mode. Please Choose "work-day" or '
-                            '"off-day".')
-    else:
-        # no more half-hourly steps
+            # Raise an error if the mode provided is not recognized.
+            raise Exception('Unknown mode. Please choose either "work-day" or "off-day".')
+
+    elif building_type == "School":
         if mode == 'work-day':
-            steps_and_ps = [(7, 0.01), (1, 0.5), (4, 0.06), (1, 0.16),
-                            (5, 0.06), (4, 0.2), (2, 0.01)]
+            # Define the profile based on the "work-day" schedule.
+            # This profile follows the "people profile" described in the SIA Standard-Nutzungsbedingungen
+            # für die Energie- und Gebäudetechnik (Merkblatt 2024) with adjustments.
+
+            steps_and_ps = [
+                (7, 0),
+                (1, 0.04 / 7.64),
+                (1, 0.39 / 7.64),
+                (1, 0.59 / 7.64),
+                (3, 2.8 / 7.64),
+                (1, 0.2 / 7.64),
+                (1, 0.6 / 7.64),
+                (2, 1.8 / 7.64),
+                (1, 0.79 / 7.64),
+                (1, 0.39 / 7.64),
+                (1, 0.04 / 7.64),
+                (4, 0)
+            ]
 
         elif mode == 'off-day':
-            steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
-                            (3, 0.036), (3, 0.143), (1, 0.018)]
+            # Define the profile for an "off-day," where no significant activity occurs for 24 hours.
+            steps_and_ps = [(24, 0)]
 
         else:
-            raise Exception('Unknown Mode. Please Choose "work-day" or '
-                            '"off-day".')
+            # Raise an error if the mode provided is not recognized.
+            raise Exception('Unknown mode. Please choose either "work-day" or "off-day".')
 
-    if test_concentrated_ps:
-        # just as a test, if p is very concentrated, only 2 hours in the morning
-        steps_and_ps = [(7, 0), (2, 1), (15, 0)]
+    elif building_type == "Grocery_store":
+        if mode == 'work-day':
+            # Define the profile based on the "work-day" schedule.
+            # This profile follows the "people profile" described in the SIA Standard-Nutzungsbedingungen
+            # für die Energie- und Gebäudetechnik (Merkblatt 2024) with adjustments.
+
+            steps_and_ps = [
+                (7, 0),
+                (1, 0.04 / 6.64),
+                (1, 0.19 / 6.64),
+                (1, 0.39 / 6.64),
+                (2, 0.8 / 6.64),
+                (3, 1.8 / 6.64),
+                (2, 0.8 / 6.64),
+                (1, 0.6 / 6.64),
+                (1, 1 / 6.64),
+                (1, 0.59 / 6.64),
+                (1, 0.39 / 6.64),
+                (1, 0.04 / 6.64),
+                (2, 0)
+            ]
+
+        elif mode == 'off-day':
+            # Define the profile for an "off-day," where no significant activity occurs for 24 hours.
+            steps_and_ps = [(24, 0)]
+
+        else:
+            # Raise an error if the mode provided is not recognized.
+            raise Exception('Unknown mode. Please choose either "work-day" or "off-day".')
 
     steps = [tup[0] for tup in steps_and_ps]
-    ps = [tup[1] for tup in steps_and_ps]
-
     assert sum(steps) == 24
-    assert sum(ps) == 1
 
     p_day = []
 
@@ -317,14 +431,14 @@ def generate_daily_probability_step_function(mode, s_step, save_fig=False,
     return p_day
 
 
-def generate_yearly_probability_profile(s_step, holidays, weekend_weekday_factor=1.2,
+def generate_yearly_probability_profile(s_step, weekend_weekday_factor,building_type, holidays,
                                         initial_day=0):
     """
     generate a summed yearly probability profile. The whole function is
     deterministic. The same inputs always produce the same outputs.
 
-    1)  Probabilities for weekdays and weekend-days are loaded (p_we, p_wd).
-    2)  Probability of weekend-days is increased relative to weekdays (shift).
+    1)  Probabilities for working days and off days are loaded (p_we, p_wd).
+    2)  Probability of off days is increased relative to working days (shift).
     3)  Based on an initial day, the yearly probability distribution (p_final)
         is generated. The seasonal influence is modelled by a sine-function.
     4)  p_final is normalized and integrated. The sum over the year is thus
@@ -340,11 +454,13 @@ def generate_yearly_probability_profile(s_step, holidays, weekend_weekday_factor
     p_we = generate_daily_probability_step_function(
         mode='off-day',
         s_step=s_step,
+        building_type=building_type
     )
 
     p_wd = generate_daily_probability_step_function(
         mode='work-day',
         s_step=s_step,
+        building_type=building_type
     )
 
     # shift towards weekend (deterministic)
@@ -361,6 +477,7 @@ def generate_yearly_probability_profile(s_step, holidays, weekend_weekday_factor
         p_work_day=p_wd_weighted,
         s_step=s_step,
         holidays=holidays,
+        building_type=building_type
     )
 
     # sum and normalize to range between 0 and 1.
@@ -408,7 +525,7 @@ def shift_weekend_weekday(p_work_day, p_off_day, factor):
 
 
 def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
-                                  s_step, holidays, plot_p_yearly=False):
+                                  s_step, holidays,building_type, plot_p_yearly=False):
     """
     Takes the probabilities of a working days and a off days and generates a
     list of yearly probabilities by adding a seasonal probability factor.
@@ -430,7 +547,7 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
     for day in range(365):
 
         # Define if the day is a working day or not
-        if (day + initial_day) % 7 in (0, 6) or (day + initial_day) in holidays:
+        if (day + initial_day) % 7 in (0, 6) or (day + initial_day) in holidays or (building_type == "School" and 151 <= (day + initial_day) <= 180):
             p_day = p_off_day
         else:
             p_day = p_work_day
@@ -646,7 +763,7 @@ def generate_single_drawoff_inside_boundaries(cats_series, s_step):
     return drawoff  # in L/h
 
 
-def compute_heat(timeseries_df, temp_dT):
+def compute_heat(timeseries_df, temp_dT=35):
     """
     Add heat columns to the timeseries
 
@@ -705,7 +822,6 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
         ax1.legend(loc="upper left")
 
         # compute some stats for figure title.
-        # todo: add to make_title_str function for Heat plots.
         max_water_flow = timeseries_df['Water_LperH'].max()  # in L/h
         s_step = timeseries_df.index.freqstr
         method = timeseries_df['method'][0]
@@ -857,7 +973,7 @@ def draw_detailed_histplot(timeseries_df):
               'with one drawoff category.')
 
 
-def add_additional_runs(timeseries_df, holidays, total_runs=5, dir_output=None):
+def add_additional_runs(timeseries_df, holidays, occupancy, building_type, total_runs=5, dir_output=None):
     """
     method to add more runs to a timeseries dataframe with the same input
     parameters as the original timeseries.
@@ -882,6 +998,8 @@ def add_additional_runs(timeseries_df, holidays, total_runs=5, dir_output=None):
             extra_timeseries_df = generate_dhw_profile(
                 s_step=s_step,
                 categories=categories,
+                occupancy=occupancy,
+                building_type = building_type,
                 holidays=holidays,
                 weekend_weekday_factor=weekend_weekday_factor,
                 mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
@@ -1410,7 +1528,6 @@ def get_s_step(timeseries_df):
 
     try:
         s_step = int(timeseries_df.index.freqstr[:-1])
-        # todo: why doesnt this work for Dataframes loaded from a csv?
 
     except TypeError:
 
