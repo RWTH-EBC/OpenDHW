@@ -11,14 +11,18 @@ two can then be compared.
 """
 
 # --- Parameters ---
-s_step = 600
 start_plot = '2019-03-04'
 end_plot = '2019-03-05'
-mean_drawoff_vol_per_day = 200
 dir_output = Path.cwd().parent / "Saved_Timeseries"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
 
 # --- constants ---
+s_step = 600
 categories = 1
+mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
+holidays = [1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365],  # Julian day number of the holidays in NRW in 2015
+occupancy = 5
+temp_dT = 35    # K
 
 
 def main():
@@ -27,6 +31,7 @@ def main():
     timeseries_df = OpenDHW.import_from_dhwcalc(
         s_step=s_step,
         categories=categories,
+        occupancy=occupancy,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
         daylight_saving=False
     )
@@ -34,7 +39,7 @@ def main():
     # Compute Heat from Water TimeSeries
     timeseries_df = OpenDHW.compute_heat(
         timeseries_df=timeseries_df,
-        temp_dT=35
+        temp_dT=temp_dT
     )
 
     timeseries_df = Utils.convert_dhw_load_to_storage_load(
@@ -50,14 +55,17 @@ def main():
     timeseries_df_opendhw = OpenDHW.generate_dhw_profile(
         s_step=s_step,
         categories=categories,
-        holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
+        occupancy=occupancy,
+        building_type=building_type,
+        weekend_weekday_factor = 1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+        holidays=holidays,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
     )
 
     # Compute Heat from Water TimeSeries
     timeseries_df_opendhw = OpenDHW.compute_heat(
         timeseries_df=timeseries_df_opendhw,
-        temp_dT=35
+        temp_dT=temp_dT
     )
 
     timeseries_df_opendhw = Utils.convert_dhw_load_to_storage_load(
