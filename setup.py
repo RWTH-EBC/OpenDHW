@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name="OpenDHW",
     version="0.2.0",
-    description="Tool for Energy Analysis and Simulation for " "Efficient Retrofit ",
+    description="Tool for generating domestic hot water profiles",
     url="https://github.com/RWTH-EBC/OpenDHW",
     author="RWTH Aachen University, E.ON Energy Research Center, "
     "Institute of Energy Efficient Buildings and Indoor Climate",
@@ -13,5 +13,5 @@ setup(
         "OpenDHW",
         "OpenDHW.utils"
     ],
-    install_requires=["scipy", "pathlib", "pandas", "numpy", "matplotlib", "seaborn"],
+    install_requires=["scipy", "pathlib", "pandas", "numpy", "matplotlib", "seaborn", "holidays"],
 )
