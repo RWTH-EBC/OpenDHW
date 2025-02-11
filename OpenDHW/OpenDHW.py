@@ -10,6 +10,10 @@ import random
 import scipy
 from scipy.stats import beta
 import matplotlib.dates as mdates
+import holidays as hol
+import json
+from pathlib import Path
+
 
 """
 This is the script that stores all function of the DHWcalc package.
@@ -34,6 +38,56 @@ sns.set_context("paper")
 rho = 980 / 1000  # kg/L for Water (at 60°C? at 10°C its = 1)
 cp = 4180  # J/kgK
 
+def load_steps_and_ps(mode, building, building_type=None, s_step=None):
+    """
+    Load the step durations and probabilities from a JSON file.
+
+    Args:
+        mode (str): Mode of operation ("work-day" or "off-day").
+        building (str): Type of building ("residential" or "non-residential").
+        building_type (str): Specific type of building (e.g., "OB", "School", "Grocery_store").
+        s_step (int): Step size in seconds, required only for residential buildings.
+
+    Returns:
+        list: List of tuples containing step durations and probabilities.
+    """
+    if building == "residential":
+
+        # Path to the JSON file containing the probabilities for residential buildings
+        json_file_path = Path(__file__).parent / "Data" / "prob_residential.json"
+
+        # Load the JSON data
+        with open(json_file_path, 'r') as file:
+            data = json.load(file)
+
+        # Determine the profile type for residential buildings
+        profile_key = "half-hourly" if s_step <= 1800 else "hourly"
+        if mode in data:
+            return data[mode][profile_key]
+        else:
+            raise Exception(f"Invalid mode: {mode}. Choose 'work-day' or 'off-day'.")
+
+    elif building == "non-residential":
+
+        if building_type is None:
+            raise Exception("For non-residential buildings, 'building_type' must be provided.")
+
+        # Path to the JSON file containing the probabilities for residential buildings
+        json_file_path = Path(__file__).parent / "Data" / "prob_nonresidential.json"
+
+        # Load the JSON data
+        with open(json_file_path, 'r') as file:
+            data = json.load(file)
+
+        # Check if the building type and mode exist in the JSON data
+        if building_type in data and mode in data[building_type]:
+            return data[building_type][mode]
+        else:
+            raise Exception(f"Invalid building type '{building_type}' or mode '{mode}'. "
+                            f"Please verify your input.")
+
+    else:
+        raise Exception(f"Invalid building category: '{building}'. Choose 'residential' or 'non-residential'.")
 
 def import_from_dhwcalc(s_step, daylight_saving, categories,occupancy,
                         mean_drawoff_vol_per_day, max_flowrate=1200):
@@ -284,31 +338,8 @@ def generate_daily_probability_step_function(mode, s_step,building_type, save_fi
 
     if building_type in {"SFH", "TH", "MFH", "AB"}:
 
-        if s_step <= 1800:
-            if mode == 'work-day':
-                steps_and_ps = [(6.5, 0.01), (1, 0.5), (4.5, 0.06), (1, 0.16),
-                                (5, 0.06), (4, 0.2), (2, 0.01)]
-
-            elif mode == 'off-day':
-                steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
-                                (3, 0.036), (3, 0.143), (1, 0.018)]
-
-            else:
-                raise Exception('Unknown Mode. Please Choose "work-day" or '
-                                '"off-day".')
-        else:
-            # no more half-hourly steps
-            if mode == 'work-day':
-                steps_and_ps = [(7, 0.01), (1, 0.5), (4, 0.06), (1, 0.16),
-                                (5, 0.06), (4, 0.2), (2, 0.01)]
-
-            elif mode == 'off-day':
-                steps_and_ps = [(7, 0.02), (2, 0.475), (6, 0.071), (2, 0.237),
-                                (3, 0.036), (3, 0.143), (1, 0.018)]
-
-            else:
-                raise Exception('Unknown Mode. Please Choose "work-day" or '
-                                '"off-day".')
+        # Load the steps and probabilities
+        steps_and_ps = load_steps_and_ps(mode = mode, building = "residential", s_step = s_step)
 
         if test_concentrated_ps:
             # just as a test, if p is very concentrated, only 2 hours in the morning
@@ -317,93 +348,17 @@ def generate_daily_probability_step_function(mode, s_step,building_type, save_fi
         ps = [tup[1] for tup in steps_and_ps]
         assert sum(ps) == 1
 
-
     elif building_type == "OB":
-        if mode == 'work-day':
-            # Define the profile based on the "work-day" schedule.
-            # This profile follows the "people profile" described in the SIA Standard-Nutzungsbedingungen
-            # für die Energie- und Gebäudetechnik (Merkblatt 2024) with adjustments.
-
-            steps_and_ps = [
-                (7, 0),
-                (1, 0.04 / 8.4),
-                (1, 0.19 / 8.4),
-                (1, 0.59 / 8.4),
-                (6, 5.93 / 8.4),
-                (1, 0.79 / 8.4),
-                (1, 0.59 / 8.4),
-                (1, 0.19 / 8.4),
-                (1, 0.04 / 8.4),
-                (1, 0.04 / 8.4),
-                (3, 0)
-            ]
-
-        elif mode == 'off-day':
-            # Define the profile for an "off-day," where no significant activity occurs for 24 hours.
-            steps_and_ps = [(24, 0)]
-
-        else:
-            # Raise an error if the mode provided is not recognized.
-            raise Exception('Unknown mode. Please choose either "work-day" or "off-day".')
+        # Load the steps and probabilities
+        steps_and_ps = load_steps_and_ps(mode = mode, building_type = building_type, building = "non-residential")
 
     elif building_type == "School":
-        if mode == 'work-day':
-            # Define the profile based on the "work-day" schedule.
-            # This profile follows the "people profile" described in the SIA Standard-Nutzungsbedingungen
-            # für die Energie- und Gebäudetechnik (Merkblatt 2024) with adjustments.
-
-            steps_and_ps = [
-                (7, 0),
-                (1, 0.04 / 7.64),
-                (1, 0.39 / 7.64),
-                (1, 0.59 / 7.64),
-                (3, 2.8 / 7.64),
-                (1, 0.2 / 7.64),
-                (1, 0.6 / 7.64),
-                (2, 1.8 / 7.64),
-                (1, 0.79 / 7.64),
-                (1, 0.39 / 7.64),
-                (1, 0.04 / 7.64),
-                (4, 0)
-            ]
-
-        elif mode == 'off-day':
-            # Define the profile for an "off-day," where no significant activity occurs for 24 hours.
-            steps_and_ps = [(24, 0)]
-
-        else:
-            # Raise an error if the mode provided is not recognized.
-            raise Exception('Unknown mode. Please choose either "work-day" or "off-day".')
+        # Load the steps and probabilities
+        steps_and_ps = load_steps_and_ps(mode = mode, building_type = building_type, building = "non-residential")
 
     elif building_type == "Grocery_store":
-        if mode == 'work-day':
-            # Define the profile based on the "work-day" schedule.
-            # This profile follows the "people profile" described in the SIA Standard-Nutzungsbedingungen
-            # für die Energie- und Gebäudetechnik (Merkblatt 2024) with adjustments.
-
-            steps_and_ps = [
-                (7, 0),
-                (1, 0.04 / 6.64),
-                (1, 0.19 / 6.64),
-                (1, 0.39 / 6.64),
-                (2, 0.8 / 6.64),
-                (3, 1.8 / 6.64),
-                (2, 0.8 / 6.64),
-                (1, 0.6 / 6.64),
-                (1, 1 / 6.64),
-                (1, 0.59 / 6.64),
-                (1, 0.39 / 6.64),
-                (1, 0.04 / 6.64),
-                (2, 0)
-            ]
-
-        elif mode == 'off-day':
-            # Define the profile for an "off-day," where no significant activity occurs for 24 hours.
-            steps_and_ps = [(24, 0)]
-
-        else:
-            # Raise an error if the mode provided is not recognized.
-            raise Exception('Unknown mode. Please choose either "work-day" or "off-day".')
+        # Load the steps and probabilities
+        steps_and_ps = load_steps_and_ps(mode=mode, building_type=building_type, building="non-residential")
 
     steps = [tup[0] for tup in steps_and_ps]
     assert sum(steps) == 24
@@ -1723,3 +1678,29 @@ def reduce_no_drawoffs(timeseries_df):
               'actual_yearly_water')
 
     return timeseries_df_cleaned
+
+
+def get_holidays(country_code: str, year: int, state: str = None):
+    """
+    Get the Julian day (day of the year) for holidays in a specific country, year, and state.
+
+    Args:
+        country_code (str): The country's ISO 3166-1 alpha-2 code (e.g., 'DE' for Germany).
+        year (int): The year for which to retrieve holidays.
+        state (str): The state or region subdivision code (e.g., 'NW' for North Rhine-Westphalia in Germany).
+
+    Returns:
+        list: A list of tuples containing the Julian day of the holiday.
+    """
+    try:
+        # Initialize the holidays object for the given country, year, and state
+        holidays = hol.CountryHoliday(country_code, years=year, subdiv=state)
+
+        # Get the Julian day for each holiday
+        julian_holidays = [holiday_date.timetuple().tm_yday for holiday_date in holidays.keys()]
+
+        return julian_holidays
+    except KeyError:
+        return f"Invalid country or state code '{country_code}', '{state}'. Please provide valid codes."
+
+

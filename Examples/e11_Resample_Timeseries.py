@@ -11,7 +11,7 @@ building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_stor
 s_steps = [60, 360, 600, 900]
 mean_drawoff_vol_per_day = 40
 categories = 4
-holidays = [1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365],  # Julian day number of the holidays in NRW in 2015
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
 occupancy = 5
 
 
