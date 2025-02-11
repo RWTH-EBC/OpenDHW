@@ -7,16 +7,18 @@ demands and compares them to their OpenDHW Equivalent.
 """
 
 # --- Parameters ---
-daily_demands = [160, 200, 240, 2000]  # 160, 200, 240, 2000
-s_step = 900
-categories = 4
 resample_method = False
 start_plot = '2019-04-05'
 end_plot = '2019-04-07'
 plot_date_slice = False
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
 
 # --- Constants ---
-
+daily_demands = [32, 40, 48, 400]  # 32, 40, 45, 400
+s_step = 900
+categories = 4
+occupancy = 5 # Number of occupants in the building
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
 
 def main():
 
@@ -25,6 +27,7 @@ def main():
         # Load time-series from DHWcalc
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
+            occupancy=occupancy,
             categories=categories,
             mean_drawoff_vol_per_day=daily_demand,
             daylight_saving=False
@@ -35,7 +38,10 @@ def main():
             open_dhw_df = OpenDHW.generate_dhw_profile(
                 s_step=s_step,
                 categories=categories,
-                holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
+                occupancy=occupancy,
+                building_type=building_type,
+                weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+                holidays=holidays,
                 mean_drawoff_vol_per_day=daily_demand,
             )
 
@@ -45,6 +51,10 @@ def main():
             open_dhw_df = OpenDHW.generate_dhw_profile(
                 s_step=60,
                 categories=categories,
+                occupancy=occupancy,
+                building_type=building_type,
+                weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+                holidays=holidays,
                 mean_drawoff_vol_per_day=daily_demand,
             )
 

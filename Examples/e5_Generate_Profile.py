@@ -5,16 +5,17 @@ import OpenDHW
 This Example generates an OpenDHW Timeseries.
 
 Like DHWcalc, OpenDHW need a parametrisation. The usual parametrisation for 
-households is 40 L/(person*day). Thus, a 5 person single family house has a mean
-drawoff volume of 200 L/day. More information can be found in 
-'OpenDHW/Resources_Water_Demand_Parametrisation'.
+households is 40 L/(person*day). This value is set 
+as 'mean_drawoff_vol_per_day'. For example, a single-family house 
+(SFH) with 5 occupants would have a total mean daily water consumption of 
+200 L/day (5 people * 40 L/person/day).
 
-A multi family house with 10 flats, and 5 people per flat thus has a mean 
-drawoff rate of 2000 L/day.
+For a multi-family house (MFH) with 10 flats and 5 people per flat, the mean 
+drawoff volume is 2000 L/day (10 flats * 5 people/flat * 40 L/person/day).
 
-For non-residental buildings, the daily probability functions should be 
-altered, as there are no typical shower or cooking periods in the morning
-and the evening.
+For non-residental buildings, the daily probability functions are based on 
+the "people profile" described in the SIA Standard-Nutzungsbedingungen
+für die Energie- und Gebäudetechnik (Merkblatt 2024).
 
 As an alternative for timesteps different from 60seconds, a second method has 
 been implemented in OpenDHW: the 'resample_water_series' function.
@@ -24,18 +25,35 @@ afterwards to the desired output stepwidth. The disadvantage is a higher
 computing time.
 """
 
+# --- Building Type Description ---
+"""
+Building types supported by the script:
+
+Residential buildings:
+    - SFH: Single Family House
+    - TH: Terraced House
+    - MFH: Multi-Family House
+    - AB: Apartment Block
+
+Non-residential buildings:
+    - School: Educational facility
+    - OB: Office building
+    - Grocery_store: Retail facility
+"""
 
 # --- Parameters ---
-s_step = 60
 resample_method = False
-mean_drawoff_vol_per_day = 200
-categories = 1
 start_plot = '2019-03-31-06'
 end_plot = '2019-03-31-09'
-temp_dT = 35    # K
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
 
 # --- Constants ---
-
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+s_step = 60
+categories = 1
+occupancy = 5
+temp_dT = 35    # K
+mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
 
 def main():
 
@@ -44,9 +62,13 @@ def main():
         timeseries_df = OpenDHW.generate_dhw_profile(
             s_step=s_step,
             categories=categories,
-            holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
-            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+            occupancy=occupancy,
+            building_type=building_type,
+            weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+            holidays=holidays,
+            mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
         )
+
 
     else:
 
@@ -54,6 +76,10 @@ def main():
         timeseries_df = OpenDHW.generate_dhw_profile(
             s_step=60,
             categories=categories,
+            occupancy=occupancy,
+            building_type=building_type,
+            weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+            holidays=holidays,
             mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
         )
 

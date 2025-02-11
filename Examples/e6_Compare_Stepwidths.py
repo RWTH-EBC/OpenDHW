@@ -7,14 +7,17 @@ them to their OpenDHW Equivalent.
 """
 
 # --- Parameters ---
-s_steps = [60, 600, 900, 3600]
-categories = 1
 resample_method = False
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
 
 # --- Constants ---
-mean_drawoff_vol_per_day = 200
+s_steps = [60, 600, 900, 3600]
+categories = 1
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
+occupancy = 5
 
 
 def main():
@@ -25,6 +28,7 @@ def main():
         dhwcalc_df = OpenDHW.import_from_dhwcalc(
             s_step=s_step,
             categories=categories,
+            occupancy=occupancy,
             mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
             daylight_saving=False
         )
@@ -34,8 +38,11 @@ def main():
             open_dhw_df = OpenDHW.generate_dhw_profile(
                 s_step=s_step,
                 categories=categories,
-                holidays=[1, 93, 96, 121, 134, 145, 155, 275, 305, 358, 359, 360, 365], # Julian day number of the holidays in NRW in 2015
-                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+                occupancy=occupancy,
+                building_type=building_type,
+                weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+                holidays=holidays,
+                mean_drawoff_vol_per_day=mean_drawoff_vol_per_day
             )
 
         else:
@@ -44,6 +51,10 @@ def main():
             open_dhw_df = OpenDHW.generate_dhw_profile(
                 s_step=60,
                 categories=categories,
+                occupancy=occupancy,
+                building_type=building_type,
+                weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
+                holidays=holidays,
                 mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
             )
 
