@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="OpenDHW",
-    version="0.2.0",
+    version="0.2.1",
     description="Tool for generating domestic hot water profiles",
     url="https://github.com/RWTH-EBC/OpenDHW",
     author="RWTH Aachen University, E.ON Energy Research Center, "
@@ -12,6 +12,7 @@ setup(
     packages=[
         "OpenDHW",
         "OpenDHW.utils"
+        "OpenDHW.Data"
     ],
     install_requires=["scipy", "pathlib", "pandas", "numpy", "matplotlib", "seaborn", "holidays"],
 )
