@@ -2,12 +2,12 @@ from setuptools import setup
 
 setup(
     name="OpenDHW",
-    version="0.1",
+    version="0.2.0",
     description="Tool for Energy Analysis and Simulation for " "Efficient Retrofit ",
     url="https://github.com/RWTH-EBC/OpenDHW",
     author="RWTH Aachen University, E.ON Energy Research Center, "
     "Institute of Energy Efficient Buildings and Indoor Climate",
-    author_email="ebc-teaser@eonerc.rwth-aachen.de",
+    author_email="ebc-tools@eonerc.rwth-aachen.de",
     license="MIT",
     packages=[
         "OpenDHW",
