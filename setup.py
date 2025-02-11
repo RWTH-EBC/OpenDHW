@@ -11,8 +11,8 @@ setup(
     license="MIT",
     packages=[
         "OpenDHW",
-        "OpenDHW.utils",
-        "OpenDHW.Data"
+        "OpenDHW.Data",
+        "OpenDHW.utils"
     ],
     install_requires=["scipy", "pathlib", "pandas", "numpy", "matplotlib", "seaborn", "holidays"],
 )
