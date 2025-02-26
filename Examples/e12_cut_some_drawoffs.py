@@ -8,13 +8,13 @@ Introduces the 'reduce_no_drawoffs' function.
 
 # --- Parameters ---
 resample_method = False
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
 start_plot = '2019-03-31'
 end_plot = '2019-04-01'
 
 # --- Constants ---
 s_step = 900
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
 mean_drawoff_vol_per_day = 40
 categories = 4
 occupancy=5

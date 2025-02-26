@@ -11,14 +11,14 @@ resample_method = False
 start_plot = '2019-04-05'
 end_plot = '2019-04-07'
 plot_date_slice = False
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
 
 # --- Constants ---
 daily_demands = [32, 40, 48, 400]  # 32, 40, 45, 400
 s_step = 900
 categories = 4
 occupancy = 5 # Number of occupants in the building
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
 
 def main():
 

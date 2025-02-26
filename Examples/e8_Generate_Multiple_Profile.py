@@ -12,14 +12,14 @@ dataframe.
 # --- Parameters ---
 s_step = 600
 runs = 5
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
 
 # --- constants ---
 mean_drawoff_vol_per_day = 40
 categories = 4
 dir_output = Path.cwd().parent / "Saved_Timeseries"
 occupancy = 5 # Number of occupants in the building
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
 
 def main():
 

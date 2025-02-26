@@ -45,7 +45,7 @@ def load_steps_and_ps(mode, building, building_type=None, s_step=None):
     Args:
         mode (str): Mode of operation ("work-day" or "off-day").
         building (str): Type of building ("residential" or "non-residential").
-        building_type (str): Specific type of building (e.g., "OB", "School", "Grocery_store").
+        building_type (str): Specific type of building (e.g., "OB", "SC", "GS").
         s_step (int): Step size in seconds, required only for residential buildings.
 
     Returns:
@@ -352,11 +352,11 @@ def generate_daily_probability_step_function(mode, s_step,building_type, save_fi
         # Load the steps and probabilities
         steps_and_ps = load_steps_and_ps(mode = mode, building_type = building_type, building = "non-residential")
 
-    elif building_type == "School":
+    elif building_type == "SC":
         # Load the steps and probabilities
         steps_and_ps = load_steps_and_ps(mode = mode, building_type = building_type, building = "non-residential")
 
-    elif building_type == "Grocery_store":
+    elif building_type == "GS":
         # Load the steps and probabilities
         steps_and_ps = load_steps_and_ps(mode=mode, building_type=building_type, building="non-residential")
 
@@ -502,7 +502,7 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
     for day in range(365):
 
         # Define if the day is a working day or not
-        if (day + initial_day) % 7 in (0, 6) or (day + initial_day) in holidays or (building_type == "School" and 151 <= (day + initial_day) <= 180):
+        if (day + initial_day) % 7 in (0, 6) or (day + initial_day) in holidays or (building_type == "SC" and 151 <= (day + initial_day) <= 180):
             p_day = p_off_day
         else:
             p_day = p_work_day

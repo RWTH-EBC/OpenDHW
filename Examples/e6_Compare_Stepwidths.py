@@ -10,12 +10,12 @@ them to their OpenDHW Equivalent.
 resample_method = False
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
 
 # --- Constants ---
 s_steps = [60, 600, 900, 3600]
 categories = 1
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
 mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
 occupancy = 5
 

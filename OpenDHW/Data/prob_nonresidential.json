@@ -53,7 +53,7 @@
             ]
         ]
     },
-    "School": {
+    "SC": {
         "work-day": [
             [
                 7,
@@ -111,7 +111,7 @@
             ]
         ]
     },
-    "Grocery_store": {
+    "GS": {
         "work-day": [
             [
                 7,

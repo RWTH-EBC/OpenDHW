@@ -14,13 +14,13 @@ two can then be compared.
 start_plot = '2019-03-04'
 end_plot = '2019-03-05'
 dir_output = Path.cwd().parent / "Saved_Timeseries"
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "School", "OB", "Grocery_store"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
 
 # --- constants ---
 s_step = 600
 categories = 1
 mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015, state = "NW") # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
 occupancy = 5
 temp_dT = 35    # K
 
