@@ -14,7 +14,7 @@ two can then be compared.
 start_plot = '2019-03-04'
 end_plot = '2019-03-05'
 dir_output = Path.cwd().parent / "Saved_Timeseries"
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 
 # --- constants ---
 s_step = 600

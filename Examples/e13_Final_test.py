@@ -13,7 +13,7 @@ resample_method = True
 plot_date_slice = False
 start_plot = '2019-04-05'
 end_plot = '2019-04-07'
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 
 # --- Constants ---
 daily_demands = [32, 40, 48, 400]  # 32, 40, 48, 400

@@ -39,13 +39,15 @@ Non-residential buildings:
     - SC: School 
     - OB: Office building
     - GS: Grocery store
+    - RE: Restaurant
+
 """
 
 # --- Parameters ---
 resample_method = False
 start_plot = '2019-03-31-06'
 end_plot = '2019-03-31-09'
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 
 # --- Constants ---
 holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.

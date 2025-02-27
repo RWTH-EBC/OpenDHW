@@ -10,7 +10,7 @@ them to their OpenDHW Equivalent.
 resample_method = False
 start_plot = '2019-03-04'
 end_plot = '2019-03-08'
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 
 # --- Constants ---
 s_steps = [60, 600, 900, 3600]

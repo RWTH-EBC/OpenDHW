@@ -45,7 +45,7 @@ def load_steps_and_ps(mode, building, building_type=None, s_step=None):
     Args:
         mode (str): Mode of operation ("work-day" or "off-day").
         building (str): Type of building ("residential" or "non-residential").
-        building_type (str): Specific type of building (e.g., "OB", "SC", "GS").
+        building_type (str): Specific type of building (e.g., "OB", "SC", "GS", "RE").
         s_step (int): Step size in seconds, required only for residential buildings.
 
     Returns:
@@ -198,7 +198,7 @@ def generate_dhw_profile(s_step, categories, mean_drawoff_vol_per_day, occupancy
         s_step=s_step,
         weekend_weekday_factor=weekend_weekday_factor,
         holidays = holidays,
-        initial_day=0,
+        initial_day=initial_day,
         building_type=building_type
     )
 
@@ -358,7 +358,11 @@ def generate_daily_probability_step_function(mode, s_step,building_type, save_fi
 
     elif building_type == "GS":
         # Load the steps and probabilities
-        steps_and_ps = load_steps_and_ps(mode=mode, building_type=building_type, building="non-residential")
+        steps_and_ps = load_steps_and_ps(mode = mode, building_type = building_type, building = "non-residential")
+
+    elif building_type == "RE":
+        # Load the steps and probabilities
+        steps_and_ps = load_steps_and_ps(mode = mode, building_type = building_type, building = "non-residential")
 
     steps = [tup[0] for tup in steps_and_ps]
     assert sum(steps) == 24
@@ -499,13 +503,23 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
     p_final = []
     timesteps_day = int(24 * 3600 / s_step)
 
+    # Define if the day is a working day or not
     for day in range(365):
+        current_day = day + initial_day  # Compute the actual day number in the year
 
-        # Define if the day is a working day or not
-        if (day + initial_day) % 7 in (0, 6) or (day + initial_day) in holidays or (building_type == "SC" and 151 <= (day + initial_day) <= 180):
-            p_day = p_off_day
-        else:
-            p_day = p_work_day
+        if building_type in ["SFH", "MFH", "TH", "AB", "OB"]:
+            is_off_day = current_day % 7 in (0, 6) or day in holidays  #(Office Building): Closed Saturdays, Sundays, and all holidays
+
+        elif building_type == "SC":
+            is_off_day = current_day % 7 in (0, 6) or day in holidays or (190 <= day <= 233) #(School): Closed Saturdays, Sundays, all holidays, and during days 190-233
+
+        elif building_type == "GS":
+            is_off_day = current_day % 7 == 0 or day in holidays #(Grocery store): Closed every Sunday and every holiday
+
+        elif building_type == "RE":
+            is_off_day = False  # (Restaurant): Never closed
+
+        p_day = p_off_day if is_off_day else p_work_day
 
         # Compute seasonal factor
         arg = math.pi * (2 / 365 * day - 1 / 4)

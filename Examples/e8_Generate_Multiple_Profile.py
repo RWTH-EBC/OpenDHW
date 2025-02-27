@@ -12,7 +12,7 @@ dataframe.
 # --- Parameters ---
 s_step = 600
 runs = 5
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 
 # --- constants ---
 mean_drawoff_vol_per_day = 40

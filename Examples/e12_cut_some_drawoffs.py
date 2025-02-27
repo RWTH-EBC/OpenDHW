@@ -8,7 +8,7 @@ Introduces the 'reduce_no_drawoffs' function.
 
 # --- Parameters ---
 resample_method = False
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 start_plot = '2019-03-31'
 end_plot = '2019-04-01'
 

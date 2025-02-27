@@ -7,7 +7,7 @@ generating a distribution with different initial timesteps. (why?)
 """
 
 # --- Parameters ---
-building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS"
+building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 s_steps = [60, 360, 600, 900]
 mean_drawoff_vol_per_day = 40
 categories = 4
