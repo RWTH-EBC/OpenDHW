@@ -11,7 +11,7 @@ building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 s_steps = [60, 360, 600, 900]
 mean_drawoff_vol_per_day = 40
 categories = 4
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2019) # Get the holiday data for the specified country, state and year.
 occupancy = 5
 
 
@@ -26,6 +26,7 @@ def main():
         weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
         holidays=holidays,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        initial_day=1  # Tuesday
     )
 
     for s_step in s_steps:
@@ -43,6 +44,7 @@ def main():
             weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
             holidays=holidays,
             mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+            initial_day=1  # Tuesday
         )
 
         # import from DHWcalc

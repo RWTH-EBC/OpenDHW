@@ -20,7 +20,7 @@ building_type = "SFH"  # "SFH", "TH", "MFH", "AB", "SC", "OB", "GS", "RE"
 s_step = 600
 categories = 1
 mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2019) # Get the holiday data for the specified country, state and year.
 occupancy = 5
 temp_dT = 35    # K
 
@@ -60,6 +60,7 @@ def main():
         weekend_weekday_factor = 1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
         holidays=holidays,
         mean_drawoff_vol_per_day=mean_drawoff_vol_per_day,
+        initial_day=1  # Tuesday
     )
 
     # Compute Heat from Water TimeSeries

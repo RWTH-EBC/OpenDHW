@@ -20,7 +20,7 @@ daily_demands = [32, 40, 48, 400]  # 32, 40, 48, 400
 s_steps = [60, 900, 3600]   # 60, 360, 600, 900
 categories_lst = [1, 4]
 occupancy=5
-holidays = OpenDHW.get_holidays(country_code = "DE", year = 2015) # Get the holiday data for the specified country, state and year.
+holidays = OpenDHW.get_holidays(country_code = "DE", year = 2019) # Get the holiday data for the specified country, state and year.
 
 def main():
 
@@ -49,6 +49,7 @@ def main():
                         weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
                         holidays=holidays,
                         mean_drawoff_vol_per_day=daily_demand,
+                        initial_day=1  # Tuesday
                     )
 
                 else:
@@ -62,6 +63,7 @@ def main():
                         weekend_weekday_factor=1.2 if building_type in {"SFH", "TH", "MFH", "AB"} else 1,
                         holidays=holidays,
                         mean_drawoff_vol_per_day=daily_demand,
+                        initial_day=1  # Tuesday
                     )
 
                     # resample to the desired stepwidth

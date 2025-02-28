@@ -505,16 +505,16 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
 
     # Define if the day is a working day or not
     for day in range(365):
-        current_day = day + initial_day  # Compute the actual day number in the year
+        current_day = (day + initial_day) % 7  # Ensure Monday = 0, ..., Sunday = 6
 
         if building_type in ["SFH", "MFH", "TH", "AB", "OB"]:
-            is_off_day = current_day % 7 in (0, 6) or day in holidays  #(Office Building): Closed Saturdays, Sundays, and all holidays
+            is_off_day = current_day in (5, 6) or (day + 1) in holidays  #(Office Building): Closed Saturdays, Sundays, and all holidays
 
         elif building_type == "SC":
-            is_off_day = current_day % 7 in (0, 6) or day in holidays or (190 <= day <= 233) #(School): Closed Saturdays, Sundays, all holidays, and during days 190-233
+            is_off_day = current_day in (5, 6) or (day + 1) in holidays or (182 <= day + 1 <= 212) #(School): Closed Saturdays, Sundays, all holidays, and during days 182-212
 
         elif building_type == "GS":
-            is_off_day = current_day % 7 == 0 or day in holidays #(Grocery store): Closed every Sunday and every holiday
+            is_off_day = current_day == 6 or (day + 1) in holidays #(Grocery store): Closed every Sunday and every holiday
 
         elif building_type == "RE":
             is_off_day = False  # (Restaurant): Never closed
