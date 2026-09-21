@@ -4,7 +4,7 @@ OpenDHW tries to mimic the behaviour of the popular free-to-use and public-funde
 
 ## Core Structure
 
-OpenDHW is mainly build on the Pandas Dataframe structure with the addition of using a DatetimeIndex ([Pandas Documentation Timeseries](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html)). This ensure fast manipulation and easy plotting of the resulting timeseries. Thus, the base structure is always initialised by a dataframe and the chosen timestep width in seconds (s_step):
+OpenDHW is mainly built on the Pandas DataFrame structure with the addition of using a DatetimeIndex ([Pandas Documentation Timeseries](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html)). This ensure fast manipulation and easy plotting of the resulting timeseries. Thus, the base structure is always initialised by a dataframe and the chosen timestep width in seconds (s_step):
 
 ```Python
 s_step = 60
