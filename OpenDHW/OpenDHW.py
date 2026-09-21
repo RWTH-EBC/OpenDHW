@@ -460,7 +460,7 @@ def shift_weekend_weekday(p_work_day, p_off_day, factor):
 
     assert p_wd_factor * 5 / 7 + p_we_factor * 2 / 7 == 1
 
-    p_wd_weighted = [p * p_we_factor for p in p_work_day]
+    p_wd_weighted = [p * p_wd_factor for p in p_work_day]
     p_we_weighted = [p * p_we_factor for p in p_off_day]
 
     av_p_wd_weighted = statistics.mean(p_wd_weighted)
