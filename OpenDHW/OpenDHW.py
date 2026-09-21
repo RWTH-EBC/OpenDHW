@@ -781,7 +781,7 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
         # compute some stats for figure title.
         max_water_flow = timeseries_df['Water_LperH'].max()  # in L/h
         s_step = timeseries_df.index.freqstr
-        method = timeseries_df['method'][0]
+        method = timeseries_df['method'].iloc[0]
 
         plt.title('Heat Time-series from {}, timestep = {}\n'
                   'with a Peak of {:.1f} L/h'.format(method, s_step,
@@ -797,10 +797,10 @@ def draw_lineplot(timeseries_df, plot_var='water', start_plot='2019-02-01',
     plt.show()
 
     if save_fig:
-        method = timeseries_df['method'][0]
+        method = timeseries_df['method'].iloc[0]
         s_step = get_s_step(timeseries_df)
-        vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
-        cats = timeseries_df['categories'][0]
+        vol_per_day = timeseries_df['mean_drawoff_vol_per_day'].iloc[0]
+        cats = timeseries_df['categories'].iloc[0]
 
         dir_output = Path.cwd() / "plots"
         dir_output.mkdir(exist_ok=True)
@@ -825,7 +825,7 @@ def draw_histplot(timeseries_df, extra_kde=False, save_fig=False):
     # get non-zero values of the profile
     drawoffs_df = get_drawoffs(timeseries_df=timeseries_df, remove_cats=False)
 
-    cats = timeseries_df['categories'][0]
+    cats = timeseries_df['categories'].iloc[0]
     if cats == 1:
         drawoffs_df = drawoffs_df['Water_LperH']
 
@@ -848,10 +848,10 @@ def draw_histplot(timeseries_df, extra_kde=False, save_fig=False):
     plt.show()
 
     if save_fig:
-        method = timeseries_df['method'][0]
+        method = timeseries_df['method'].iloc[0]
         s_step = get_s_step(timeseries_df)
-        vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
-        cats = timeseries_df['categories'][0]
+        vol_per_day = timeseries_df['mean_drawoff_vol_per_day'].iloc[0]
+        cats = timeseries_df['categories'].iloc[0]
 
         dir_output = Path.cwd() / "plots"
         dir_output.mkdir(exist_ok=True)
@@ -868,14 +868,14 @@ def draw_detailed_histplot(timeseries_df):
     https://towardsdatascience.com/advanced-histogram-using-python-bceae288e715
     plot to further analyse timeseries with 1 drawoff category.
     """
-    cats = timeseries_df['categories'][0]
-    method = timeseries_df['method'][0]
+    cats = timeseries_df['categories'].iloc[0]
+    method = timeseries_df['method'].iloc[0]
 
     if cats == 1 and method == 'DHWcalc':
 
         # create bin values
-        mean = timeseries_df['mean_drawoff_flow_rate_LperH'][0]
-        sdtdev = timeseries_df['sdtdev_drawoff_flow_rate_LperH'][0]
+        mean = timeseries_df['mean_drawoff_flow_rate_LperH'].iloc[0]
+        sdtdev = timeseries_df['sdtdev_drawoff_flow_rate_LperH'].iloc[0]
         non_zero_min = timeseries_df[timeseries_df['Water_LperH'] > 0][
             'Water_LperH'].min()  # smallest entry that is not 0.
 
@@ -943,11 +943,11 @@ def add_additional_runs(timeseries_df, holidays, occupancy, building_type, total
     added_runs = total_runs - 1
 
     s_step = int(timeseries_df.index.freqstr[:-1])
-    mean_drawoff_vol_per_day = timeseries_df['mean_drawoff_vol_per_day'][0]
-    weekend_weekday_factor = timeseries_df['weekend_weekday_factor'][0]
-    initial_day = timeseries_df['initial_day'][0]
-    method = timeseries_df['method'][0]
-    categories = timeseries_df['categories'][0]
+    mean_drawoff_vol_per_day = timeseries_df['mean_drawoff_vol_per_day'].iloc[0]
+    weekend_weekday_factor = timeseries_df['weekend_weekday_factor'].iloc[0]
+    initial_day = timeseries_df['initial_day'].iloc[0]
+    method = timeseries_df['method'].iloc[0]
+    categories = timeseries_df['categories'].iloc[0]
 
     if method == 'OpenDHW':
 
@@ -1165,8 +1165,8 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
     :param save_fig:                    bool:   save the plot
     """
 
-    cats_1 = timeseries_df_1['categories'][0]
-    cats_2 = timeseries_df_2['categories'][0]
+    cats_1 = timeseries_df_1['categories'].iloc[0]
+    cats_2 = timeseries_df_2['categories'].iloc[0]
     if cats_1 or cats_2 == 1:
         print("detailed distribution is designed to compare timeseries with "
               "one drawoff category")
@@ -1307,8 +1307,8 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         drawoffs_lst = [drawoffs_1, drawoffs_2]
 
         # create bin values
-        mean1 = timeseries_df_1['mean_drawoff_flow_rate_LperH'][0]
-        sdtdev1 = timeseries_df_1['sdtdev_drawoff_flow_rate_LperH'][0]
+        mean1 = timeseries_df_1['mean_drawoff_flow_rate_LperH'].iloc[0]
+        sdtdev1 = timeseries_df_1['sdtdev_drawoff_flow_rate_LperH'].iloc[0]
         non_zero_min1 = timeseries_df_1[timeseries_df_1['Water_LperH'] > 0][
             'Water_LperH'].min()  # smallest entry that is not 0.
 
@@ -1322,8 +1322,8 @@ def compare_generators(timeseries_df_1, timeseries_df_2,
         bin_values1 = list(set(bin_values1))  # remove double entries
         bin_values1.sort()  # bins have to be sorted
 
-        mean2 = timeseries_df_2['mean_drawoff_flow_rate_LperH'][0]
-        sdtdev2 = timeseries_df_2['sdtdev_drawoff_flow_rate_LperH'][0]
+        mean2 = timeseries_df_2['mean_drawoff_flow_rate_LperH'].iloc[0]
+        sdtdev2 = timeseries_df_2['sdtdev_drawoff_flow_rate_LperH'].iloc[0]
         non_zero_min2 = timeseries_df_2[timeseries_df_2['Water_LperH'] > 0][
             'Water_LperH'].min()  # smallest entry that is not 0.
 
@@ -1510,8 +1510,8 @@ def make_title_str(timeseries_df):
     yearly_water_demand = timeseries_df['Water_L'].sum()  # in L
     drawoffs = timeseries_df[timeseries_df['Water_LperH'] != 0]['Water_LperH']
     max_water_flow = timeseries_df['Water_LperH'].max()
-    method = timeseries_df['method'][0]
-    cats = timeseries_df['categories'][0]
+    method = timeseries_df['method'].iloc[0]
+    cats = timeseries_df['categories'].iloc[0]
 
     if cats == 1:
         method = "{} ({} cat)".format(method, cats)
@@ -1642,7 +1642,7 @@ def reduce_no_drawoffs(timeseries_df):
     """
 
     # get the expected yearly water demand
-    expected_yearly_water = timeseries_df['mean_drawoff_vol_per_day'][0] * 365
+    expected_yearly_water = timeseries_df['mean_drawoff_vol_per_day'].iloc[0] * 365
     actual_yearly_water = timeseries_df['Water_L'].sum()
 
     if expected_yearly_water < actual_yearly_water:
