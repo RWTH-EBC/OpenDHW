@@ -162,7 +162,7 @@ def import_from_dhwcalc(s_step, daylight_saving, categories,occupancy,
     return timeseries_df
 
 
-def generate_dhw_profile(s_step, categories, mean_drawoff_vol_per_day, occupancy, holidays, building_type,  weekend_weekday_factor, initial_day=0):
+def generate_dhw_profile(s_step, categories, mean_drawoff_vol_per_day, occupancy, holidays, building_type,  weekend_weekday_factor, initial_day=0, occupancy_profile=None):
     """
     Generates a DHW profile. The generation is split up in different
     functions and generally follows the methodology described in the DHWcalc
@@ -178,7 +178,12 @@ def generate_dhw_profile(s_step, categories, mean_drawoff_vol_per_day, occupancy
     :param categories:                  int:    1 or 4 (see DHWcalc)
     :param weekend_weekday_factor:      int:    taken from DHWcalc
     :param mean_drawoff_vol_per_day:    int:    daily water demand in Liters
+    :param occupancy:                    float:  occupancy of the building, between 0 and 1, multiplies the water demand
+    :param holidays:                   list:   list of holidays (day of year, 1-365)
+    :param building_type:                string: type of building, determines which days are off days
     :param initial_day:                 int:    0:Mon - 1:Tues ... 6:Sun
+    :param occupancy_profile:           list:   optional profile to adjust the probabilities, has to fit in length to p_final (s_step)
+
     :return: timeseries_df              df:     dataframe with all timeseries
     """
 
@@ -199,7 +204,8 @@ def generate_dhw_profile(s_step, categories, mean_drawoff_vol_per_day, occupancy
         weekend_weekday_factor=weekend_weekday_factor,
         holidays = holidays,
         initial_day=initial_day,
-        building_type=building_type
+        building_type=building_type,
+        occupancy_profile=occupancy_profile
     )
 
     # --- empty drawoffs list, will be filled afterwards
@@ -379,7 +385,7 @@ def generate_daily_probability_step_function(mode, s_step,building_type, save_fi
 
 
 def generate_yearly_probability_profile(s_step, weekend_weekday_factor,building_type, holidays,
-                                        initial_day=0):
+                                        initial_day=0, occupancy_profile=None):
     """
     generate a summed yearly probability profile. The whole function is
     deterministic. The same inputs always produce the same outputs.
@@ -394,6 +400,10 @@ def generate_yearly_probability_profile(s_step, weekend_weekday_factor,building_
     :param s_step:                  int:    seconds in a timestep
     :param weekend_weekday_factor:  float:  shift probabilities towards weekend
     :param initial_day:             int:    Mon: 0 ... Sun: 6
+    :param holidays:                list:   list of holidays (day of year, 1-365)
+    :param building_type:            string: type of building, determines which days are off days
+    :param occupancy_profile:        list:   optional profile to adjust the probabilities, has to fit in length to p_final
+
     :return: timeseries_df:         df:     df that holds the yearly profile
     """
 
@@ -424,7 +434,8 @@ def generate_yearly_probability_profile(s_step, weekend_weekday_factor,building_
         p_work_day=p_wd_weighted,
         s_step=s_step,
         holidays=holidays,
-        building_type=building_type
+        building_type=building_type,
+        occupancy_profile=occupancy_profile
     )
 
     # sum and normalize to range between 0 and 1.
@@ -472,18 +483,20 @@ def shift_weekend_weekday(p_work_day, p_off_day, factor):
 
 
 def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
-                                  s_step, holidays,building_type, plot_p_yearly=False):
+                                  s_step, holidays,building_type, plot_p_yearly=False, occupancy_profile=None):
     """
     Takes the probabilities of a working days and a off days and generates a
     list of yearly probabilities by adding a seasonal probability factor.
     The seasonal factor is a sine-function, like in DHWcalc.
 
-    :param initial_day:     int:    0: Mon, 1: Tue, 2: Wed, 3: Thur, 4: Fri,
-                                    5 : Sat, 6 : Sun
+    :param initial_day:     int:    0: Mon, 1: Tue, 2: Wed, 3: Thur, 4: Fri, 5 : Sat, 6 : Sun
     :param p_off_day:       list:   probabilities of an off day
     :param p_work_day:       list:   probabilities of a working day
     :param s_step:          int:    seconds within a timestep
     :param plot_p_yearly:   bool:   plot the yearly probabilities
+    :param holidays:        list:   list of holidays (day of year, 1-365)
+    :param building_type:    string: type of building, determines which days are off days
+    :param occupancy_profile: list:   optional profile to adjust the probabilities, has to fit in length to p_final
 
     :return: p_final:       list:   probabilities of a full year
     """
@@ -516,6 +529,40 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
         for step in range(timesteps_day):
             probability = p_day[step] * probability_season
             p_final.append(probability)
+
+    p_final = np.array(p_final)
+
+    if occupancy_profile is not None:
+        occupancy_profile = np.asarray(occupancy_profile, dtype=float)
+
+        if occupancy_profile.ndim != 1 or occupancy_profile.size == 0:
+            raise ValueError("occupancy_profile must be a non-empty 1-D array-like of numbers.")
+        if not np.all(np.isfinite(occupancy_profile)):
+            raise ValueError("occupancy_profile must not contain NaN or infinite values.")
+        if np.any(occupancy_profile < 0):
+            raise ValueError("occupancy_profile must not contain negative values.")
+        if not np.any(occupancy_profile):
+            raise ValueError(
+                "occupancy_profile is all zeros; this would zero out the entire "
+                "probability distribution and cause a division by zero downstream."
+            )
+
+        len_p = len(p_final)
+        len_occ = len(occupancy_profile)
+        if len_occ != len_p:
+            ratio = len_p / len_occ
+            if ratio.is_integer() and ratio > 1:
+                occupancy_profile = np.repeat(occupancy_profile, int(ratio))
+            else:
+                direction = "longer than" if len_occ > len_p else "not an integer divisor of"
+                raise ValueError(
+                    f"occupancy_profile length ({len_occ}) is {direction} the target length "
+                    f"({len_p}, from s_step={s_step}). occupancy_profile must either match "
+                    f"the target length exactly, or be a shorter list whose length divides "
+                    f"evenly into it (it will be upsampled via np.repeat); downsampling a "
+                    f"longer profile is not supported."
+                )
+        p_final *= occupancy_profile
 
     if plot_p_yearly:
         fig, ax = plt.subplots()
