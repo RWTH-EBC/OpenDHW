@@ -533,7 +533,20 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
     p_final = np.array(p_final)
 
     if occupancy_profile is not None:
-        occupancy_profile = np.array(occupancy_profile)
+        occupancy_profile = np.asarray(occupancy_profile, dtype=float)
+
+        if occupancy_profile.ndim != 1 or occupancy_profile.size == 0:
+            raise ValueError("occupancy_profile must be a non-empty 1-D array-like of numbers.")
+        if not np.all(np.isfinite(occupancy_profile)):
+            raise ValueError("occupancy_profile must not contain NaN or infinite values.")
+        if np.any(occupancy_profile < 0):
+            raise ValueError("occupancy_profile must not contain negative values.")
+        if not np.any(occupancy_profile):
+            raise ValueError(
+                "occupancy_profile is all zeros; this would zero out the entire "
+                "probability distribution and cause a division by zero downstream."
+            )
+
         len_p = len(p_final)
         len_occ = len(occupancy_profile)
         if len_occ != len_p:
@@ -543,7 +556,7 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
             else:
                 raise ValueError(
                     f"Error adjusting length of occupancy profile. Length {len_p} (s_step={s_step}) "
-                    f"doesnt fit to occupancy {len_occ}. "
+                    f"doesn't fit to occupancy {len_occ}."
                 )
         p_final *= occupancy_profile
 
