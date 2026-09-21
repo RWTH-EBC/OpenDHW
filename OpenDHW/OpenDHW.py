@@ -554,9 +554,13 @@ def generate_yearly_probabilities(initial_day, p_off_day, p_work_day,
             if ratio.is_integer() and ratio > 1:
                 occupancy_profile = np.repeat(occupancy_profile, int(ratio))
             else:
+                direction = "longer than" if len_occ > len_p else "not an integer divisor of"
                 raise ValueError(
-                    f"Error adjusting length of occupancy profile. Length {len_p} (s_step={s_step}) "
-                    f"doesn't fit to occupancy {len_occ}."
+                    f"occupancy_profile length ({len_occ}) is {direction} the target length "
+                    f"({len_p}, from s_step={s_step}). occupancy_profile must either match "
+                    f"the target length exactly, or be a shorter list whose length divides "
+                    f"evenly into it (it will be upsampled via np.repeat); downsampling a "
+                    f"longer profile is not supported."
                 )
         p_final *= occupancy_profile
 
