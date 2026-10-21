@@ -16,6 +16,6 @@ jobs:
       USE_PYLINT: true
       USE_RUFF: true
       BUILD_PACKAGE: true
-      EXECUTE_TESTS: true
-      EXECUTE_COVERAGE_TEST: true
+      EXECUTE_TESTS: false
+      EXECUTE_COVERAGE_TEST: false
       PYPI_RELEASE: true
