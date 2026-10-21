@@ -19,7 +19,6 @@ s_steps = [60, 360, 600, 900, 3600]
 mean_drawoff_vol_per_day = 40 # Mean daily water consumption per person in liters
 occupancy = 5 # Number of occupants in the building
 
-
 def main():
 
     for s_step in s_steps:
